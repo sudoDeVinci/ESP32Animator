@@ -131,6 +131,7 @@ void render(Renderer* rend) {
  * @param maxBrightness The maximum brightness
  * @param frequency The frequency of the breathing
  * @return The new animation
+ * @details A smooth, sinusoidal increase and decrease in brightness, mimicking breathing.
  */
 Animation* createBreatheAnimation(uint8_t ledCount,
                                 float minBrightness,
@@ -186,10 +187,12 @@ Animation* createBreatheAnimation(uint8_t ledCount,
  * Create a new growing bar animation
  * WARNING: Animation is dynamically allocated and must be freed.
  * @param ledCount The number of LEDs in the strip
+ * @param maxBrightness The maximum brightness of the bar
  * @param startHeight The starting height of the bar
  * @param endHeight The ending height of the bar
  * @param abruptFade If true, the bar will abruptly fade in and out
  * @return The new animation
+ * @details A bright bar starts at X% of the height on each side and each “up” button press causes bar to grow towards the top, and each “down” button press causes bar to shrink.
  */
 Animation* createGrowingBarAnimation(uint8_t ledCount,
                                      uint8_t maxBrightness,
@@ -259,6 +262,7 @@ Animation* createGrowingBarAnimation(uint8_t ledCount,
 /**
  * @brief Creates a shrinking bar animation
  * @param ledCount Number of LEDs in the strip
+ * @param maxBrightness Maximum brightness of the bar
  * @param startHeight Starting height of the bar (0 = auto)
  * @param endHeight Ending height of the bar (0 = auto)
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
@@ -334,6 +338,7 @@ Animation* createShrinkingBarAnimation(uint8_t ledCount,
 /**
  * @brief Creates an extending bar animation
  * @param ledCount Number of LEDs in the strip
+ * @param maxBrightness Maximum brightness of the bar
  * @param endDistance Maximum distance from center (0 = auto)
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
  * @return Animation object with extending bar effect
@@ -402,7 +407,12 @@ Animation* createExtendingBarAnimation(uint8_t ledCount,
 
 
 /**
- * 
+ * @brief Creates an extinguishing bar animation
+ * @param ledCount Number of LEDs in the strip
+ * @param maxBrightness Maximum brightness of the bar
+ * @param retentionTime Time to keep the bar at full brightness (ms)
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with extinguishing bar effect
  */
 Animation* createExtinguishingBarAnimation(uint8_t ledCount,
                                            uint8_t maxBrightness,
@@ -517,9 +527,15 @@ Animation* createExtinguishingBarAnimation(uint8_t ledCount,
 
 
 /**
- * This requires button input so we only render the first frame.
+ * @brief This requires button input so we only render the first frame.
+ * @param ledCount Number of LEDs in the strip
+ * @param brightness Brightness of the bar
+ * @param barSize Size of the bar
+ * @return Animation object with moving bar effect
  */
-Animation* createMovingBarAnimation(uint8_t ledCount, uint8_t brightness, uint8_t barSize) {
+Animation* createMovingBarAnimation(uint8_t ledCount,
+                                    uint8_t brightness,
+                                    uint8_t barSize) {
     Animation* animation = new Animation("Moving Bar");
 
     xSemaphoreTake(animation->LOCK, portMAX_DELAY);
@@ -551,8 +567,143 @@ Animation* createMovingBarAnimation(uint8_t ledCount, uint8_t brightness, uint8_
 }
 
 
-Animation createGrowUpAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance, bool abruptFade) {
-    Animation animation;
+/**
+ * @brief Creates a new animation that grows from the center
+ * @param ledCount Number of LEDs in the strip
+ * @param brightness Brightness of the bar
+ * @param endDistance Maximum distance from center
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with growing bar effect
+ */
+Animation* createGrowUpAnimation(uint8_t ledCount,
+                                 uint8_t brightness,
+                                 uint8_t endDistance,
+                                 bool abruptFade) {
+    Animation* animation = new Animation("Grow Up");
+
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames -> reserve(endDistance + 5);
+
+    // Default value if not specified
+    if (endDistance == 0) endDistance = ledCount / 2;
+    
+    int middleLed = ledCount / 2;
+
+    for (int extent = 0; extent <= endDistance; extent++) {
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);
+        uint8_t brightnessmod = brightness;
+        for (int led = middleLed; led <= middleLed + extent && led < ledCount; led++) {
+            // For soft fade, add a gradient at the top edge
+            if (!abruptFade && led == middleLed + extent) uint8_t brightnessmod = brightness / 2; // Half brightness for edge LED
+
+            std::array<uint8_t, 4> pixel = {
+                (uint8_t)led,    // LED index
+                brightnessmod,             // R
+                brightnessmod,             // G
+                brightnessmod              // B
+            };
+            frame.push_back(pixel);
+        }
+
+        frames -> push_back(frame);
+    }
+
+    xSemaphoreGive(animation->LOCK);
+    return animation;
+}
+
+
+/**
+ * WARNING: Animation is dynamically allocated and must be freed.
+ * @brief Creates a new animation that grows down from the center
+ * @param ledCount Number of LEDs in the strip
+ * @param brightness Brightness of the bar
+ * @param endDistance Maximum distance from center
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with growing bar effect
+ */
+Animation* createGrowDownAnimation(uint8_t ledCount,
+                                  uint8_t brightness,
+                                  uint8_t endDistance,
+                                  bool abruptFade) {
+    Animation* animation = new Animation("Grow Down");
+
+    if (endDistance == 0) endDistance = ledCount / 2;
+    int middleLed = ledCount / 2;
+
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames -> reserve(endDistance + 5);
+
+
+    for (int extent = 0; extent <= endDistance; extent++) {
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);
+        uint8_t brightnessmod = brightness;
+
+        for (int led = middleLed; led >= middleLed - extent && led >= 0; led--) {
+            // For soft fade, add a gradient at the top edge
+            if (!abruptFade && led == middleLed + extent) uint8_t brightnessmod = brightness / 2; // Half brightness for edge LED
+            std::array<uint8_t, 4> pixel = {
+                (uint8_t)led,    // LED index
+                brightnessmod,             // R
+                brightnessmod,             // G
+                brightnessmod              // B
+            };
+            frame.push_back(pixel);
+        }
+
+        frames -> push_back(frame);
+    }
+
+    xSemaphoreGive(animation->LOCK);
+    return animation;
+}
+
+/**
+ * @brief Starts with all LEDs on, and top half dims when “up” button pressed and bottom half dims when “down” button pressed
+ * @details This animation requires button input for dimming, so we just create one frame
+ * @param ledCount Number of LEDs in the strip
+ * @param dimLevel Maximum brightness of the half
+ * @param gradientFade If true, the fade is gradual; if false, it is abrupt
+ * @return Animation object with first frame of half fade effect
+ */
+Animation* createHalfFadeAnimation(uint8_t ledCount, float dimLevel, bool gradientFade) {
+    Animation* animation = new Animation("Half Fade");
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames -> reserve(1);
+
+    // Create initial frame with all LEDs on
+    std::vector<std::array<uint8_t, 4>> frame;
+    for (int led = 0; led < ledCount; led++) {
+        std::array<uint8_t, 4> pixel = {
+            (uint8_t)led,    // LED index
+            255,             // R
+            255,             // G
+            255              // B
+        };
+        frame.push_back(pixel);
+    }
+    frames -> push_back(frame);
+    xSemaphoreGive(animation->LOCK);
+    return animation;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

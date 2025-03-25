@@ -183,34 +183,34 @@ struct Renderer {
     }
 };
 
-
 /**
- * Create a new breathing animation
  * WARNING: Animation is dynamically allocated and must be freed.
  * @param ledCount The number of LEDs in the strip
  * @param minBrightness The minimum brightness
  * @param maxBrightness The maximum brightness
  * @param frequency The frequency of the breathing
  * @return The new animation
+ * @details A smooth, sinusoidal increase and decrease in brightness, mimicking breathing.
  */
 Animation* createBreatheAnimation(uint8_t ledCount, float minBrightness = 0.025, float maxBrightness = 1.0, int frequency = 1);
 
-
 /**
- * Create a new growing bar animation
  * WARNING: Animation is dynamically allocated and must be freed.
  * @param ledCount The number of LEDs in the strip
+ * @param maxBrightness The maximum brightness of the bar
  * @param startHeight The starting height of the bar
  * @param endHeight The ending height of the bar
  * @param abruptFade If true, the bar will abruptly fade in and out
  * @return The new animation
+ * @details A bright bar starts at X% of the height on each side and each “up” button press causes bar to grow towards the top, and each “down” button press causes bar to shrink.
  */
 Animation* createGrowingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint8_t startHeight = 0, uint8_t endHeight = 0, bool abruptFade = false);
 
-
 /**
+ * WARNING: Animation is dynamically allocated and must be freed.
  * @brief Creates a shrinking bar animation
  * @param ledCount Number of LEDs in the strip
+ * @param maxBrightness Maximum brightness of the bar
  * @param startHeight Starting height of the bar (0 = auto)
  * @param endHeight Ending height of the bar (0 = auto)
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
@@ -220,8 +220,10 @@ Animation* createGrowingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, ui
 Animation* createShrinkingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint8_t startHeight = 0, uint8_t endHeight = 0, bool abruptFade = true);
 
 /**
+ * WARNING: Animation is dynamically allocated and must be freed.
  * @brief Creates an extending bar animation
  * @param ledCount Number of LEDs in the strip
+ * @param maxBrightness Maximum brightness of the bar
  * @param endDistance Maximum distance from center (0 = auto)
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
  * @return Animation object with extending bar effect
@@ -229,11 +231,59 @@ Animation* createShrinkingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, 
  */
 Animation* createExtendingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint8_t endDistance = 0, bool abruptFade = false);
 
-
+/**
+ * WARNING: Animation is dynamically allocated and must be freed.
+ * @brief Creates an extinguishing bar animation
+ * @param ledCount Number of LEDs in the strip
+ * @param maxBrightness Maximum brightness of the bar
+ * @param retentionTime Time to keep the bar at full brightness (ms)
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with extinguishing bar effect
+ */
 Animation* createExtinguishingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint16_t retentionTime = 500, bool abruptFade = false);
 
-
+/**
+ * WARNING: Animation is dynamically allocated and must be freed.
+ * @brief This requires button input so we only render the first frame.
+ * @param ledCount Number of LEDs in the strip
+ * @param brightness Brightness of the bar
+ * @param barSize Size of the bar
+ * @return Animation object with moving bar effect
+ */
 Animation* createMovingBarAnimation(uint8_t ledCount, uint8_t brightness, uint8_t barSize = 5);
+
+/**
+ * WARNING: Animation is dynamically allocated and must be freed.
+ * @brief Creates a new animation that grows up from the center
+ * @param ledCount Number of LEDs in the strip
+ * @param brightness Brightness of the bar
+ * @param endDistance Maximum distance from center
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with growing bar effect
+ */
+Animation* createGrowUpAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance = 0, bool abruptFade = true);
+
+/**
+ * WARNING: Animation is dynamically allocated and must be freed.
+ * @brief Creates a new animation that grows down from the center
+ * @param ledCount Number of LEDs in the strip
+ * @param brightness Brightness of the bar
+ * @param endDistance Maximum distance from center
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with growing bar effect
+ */
+Animation* createGrowDownAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance, bool abruptFade);
+
+/**
+ * @brief Starts with all LEDs on, and top half dims when “up” button pressed and bottom half dims when “down” button pressed
+ * @details This animation requires button input for dimming, so we just create one frame
+ * @param ledCount Number of LEDs in the strip
+ * @param dimLevel Maximum brightness of the half
+ * @param gradientFade If true, the fade is gradual; if false, it is abrupt
+ * @return Animation object with first frame of half fade effect
+ */
+Animation* createHalfFadeAnimation(uint8_t ledCount, float dimLevel = 0.2, bool gradientFade = false);
+
 
 /**
  * Render the current animation with the given renderer settings.

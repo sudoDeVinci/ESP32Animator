@@ -33,7 +33,7 @@ void setup() {
     xSemaphoreTake(renderer.LOCK, portMAX_DELAY);
     renderer.LEDCOUNT = 15;
     renderer.PIN = LED_PIN;
-    renderer.DELAY = 50;
+    renderer.DELAY = 100;
     renderer.REPEATDELAY = 2500;
     renderer.SPEED = 1;
     renderer.PEAKBRIGHTNESS = 0.25;
@@ -46,7 +46,7 @@ void setup() {
     vTaskDelay(200);
 
     // Start with a breathing animation - use stack-based variable and pass by reference
-    Animation* breathe = createExtinguishingBarAnimation(renderer.LEDCOUNT, 100);
+    Animation* breathe = createGrowUpAnimation(renderer.LEDCOUNT, 100);
     renderer.setAnimation(*breathe);
     delete breathe;  // Clean up our animation after copying its data
     debugln("About to start render task");
