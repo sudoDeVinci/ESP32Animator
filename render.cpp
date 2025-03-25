@@ -693,6 +693,185 @@ Animation* createHalfFadeAnimation(uint8_t ledCount, float dimLevel, bool gradie
 }
 
 
+/**
+ * Create a new pulse animation with quick rise and slow decay
+ * @param ledCount The number of LEDs in the strip
+ * @param minBrightness The minimum brightness (0.0-1.0)
+ * @param maxBrightness The maximum brightness (0.0-1.0)
+ * @param attackProportion What fraction of the cycle is the attack (0.0-1.0)
+ * @param frequency Relative speed of the animation (higher = faster)
+ * @return Animation* Pointer to the created animation
+ */
+Animation* createPulseAnimation(uint8_t ledCount, 
+                               float minBrightness, 
+                               float maxBrightness,
+                               float attackProportion,
+                               float frequency) {
+    debugln(">> Creating pulse animation");
+    Animation* animation = new Animation("Pulse");
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    
+    // Use frequency to adjust frame count - higher frequency = fewer frames
+    // Base frame count is 30 at frequency 1.0
+    const int frameCount = max(10, int(30 / frequency));
+    
+    debugln("Creating pulse animation with " + String(frameCount) + " frames (frequency: " + String(frequency) + ")");
+    
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    frames->reserve(frameCount);
+    
+    // Calculate attack and decay frame counts
+    int attackFrames = max(1, int(frameCount * attackProportion));
+    int decayFrames = frameCount - attackFrames;
+    
+    debugln("Attack frames: " + String(attackFrames) + ", Decay frames: " + String(decayFrames));
+    
+    for (int i = 0; i < frameCount; i++) {
+        float brightness;
+        
+        // Fast attack phase
+        if (i < attackFrames) {
+            // Use a slightly accelerating curve for more dramatic attack
+            float progress = float(i) / float(attackFrames);
+            // Quadratic curve for acceleration effect
+            brightness = minBrightness + (maxBrightness - minBrightness) * 
+                         (progress * progress);
+        } 
+        // Slow decay phase
+        else {
+            // Exponential decay curve for more natural falloff
+            float decayProgress = float(i - attackFrames) / float(decayFrames);
+            // Adjust decay rate for more dramatic effect
+            float decayRate = 4.0 * frequency; // Higher frequency = faster decay
+            brightness = maxBrightness - (maxBrightness - minBrightness) * 
+                         (1.0 - exp(-decayRate * decayProgress));
+        }
+        
+        // Create a new frame
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);
+        
+        // Convert brightness to pixel value
+        uint8_t pixelval = static_cast<uint8_t>(brightness * 255);
+        
+        // Set all LEDs to the calculated brightness
+        for (int led = 0; led < ledCount; led++) {
+            std::array<uint8_t, 4> pixel = {
+                static_cast<uint8_t>(led),
+                pixelval,
+                pixelval,
+                pixelval
+            };
+            frame.push_back(pixel);
+        }
+        
+        // Add the frame to the animation
+        frames->push_back(frame);
+    }
+    
+    xSemaphoreGive(animation->LOCK);
+    debugln("Pulse animation created with " + String(frameCount) + " frames");
+    return animation;
+}
+
+
+/**
+ * Create an animation where a bright dot circles around the LED strip
+ * @param ledCount The number of LEDs in the strip
+ * @param abruptFade If false, the dot has a faded trail; if true, it's just a single dot
+ * @param clockwise Direction of movement (true = clockwise, false = counterclockwise)
+ * @param trailLength Number of LEDs in the trail (ignored if abruptFade is true)
+ * @param brightness Maximum brightness of the dot (0-255)
+ * @return Animation* Pointer to the created animation
+ */
+Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
+                                            bool abruptFade,
+                                            bool clockwise,
+                                            uint8_t trailLength,
+                                            uint8_t brightness ) {
+    Animation* animation = new Animation("Circling Bright Dot");
+    
+    int frameCount = ledCount;
+    
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames->reserve(frameCount);
+    
+    // For each frame in the animation
+    for (int frame = 0; frame < frameCount; frame++) {
+        std::vector<std::array<uint8_t, 4>> frameData;
+        frameData.reserve(abruptFade ? 1 : trailLength); // Optionally reserve space for the dot and its trail
+        
+        // Calculate the current position (floating point for sub-LED positioning)
+        float position = ((float)frame / 1.0f);
+        
+        // Reverse direction if counter-clockwise
+        if (!clockwise) {
+            position = ledCount - position;
+        }
+        
+        // Calculate the main dot position
+        float mainPosition = fmod(position, ledCount);
+        int mainLed = (int)mainPosition;
+        
+        // Calculate brightness for fractional position (interpolation between LEDs)
+        float fractional = mainPosition - mainLed;
+        uint8_t currentBrightness = brightness;
+        uint8_t nextBrightness = brightness * (1.0f - fractional);
+        
+        // Add the main bright dot
+        std::array<uint8_t, 4> mainPixel = {
+            static_cast<uint8_t>(mainLed % ledCount),
+            currentBrightness,
+            currentBrightness,
+            currentBrightness
+        };
+        frameData.push_back(mainPixel);
+        
+        // Add the next LED for smooth movement (interpolation)
+        std::array<uint8_t, 4> nextPixel = {
+            static_cast<uint8_t>((mainLed + 1) % ledCount),
+            nextBrightness,
+            nextBrightness,
+            nextBrightness
+        };
+        frameData.push_back(nextPixel);
+        
+        // Add trail if not using abrupt fade
+        if (!abruptFade) {
+            for (int i = 1; i < trailLength; i++) {
+                // Calculate the trail LED position
+                int trailLed;
+                if (clockwise) {
+                    trailLed = (mainLed - i + ledCount) % ledCount;
+                } else {
+                    trailLed = (mainLed + i) % ledCount;
+                }
+                
+                // Calculate trail brightness - exponential decay
+                float trailFactor = exp(-(float)i * 0.4f);
+                uint8_t trailBrightness = currentBrightness * trailFactor;
+                
+                // Skip if trail is too dim
+                if (trailBrightness < 5) continue;
+                
+                std::array<uint8_t, 4> trailPixel = {
+                    static_cast<uint8_t>(trailLed),
+                    trailBrightness,
+                    trailBrightness,
+                    trailBrightness
+                };
+                frameData.push_back(trailPixel);
+            }
+        }
+        
+        frames->push_back(frameData);
+    }
+    
+    xSemaphoreGive(animation->LOCK);
+    debugln("Circling Bright Dot animation created with " + String(frameCount) + " frames");
+    return animation;
+}
 
 
 

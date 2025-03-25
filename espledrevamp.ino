@@ -17,7 +17,7 @@ void renderTask(void* parameters) {
       if (renderer.isRunning()) {
         render(&renderer);
       }
-      vTaskDelay(renderer.DELAY / renderer.SPEED);
+      vTaskDelay(renderer.REPEATDELAY / renderer.SPEED);
     }
 }
 
@@ -31,12 +31,12 @@ void setup() {
 
     // Initialize renderer with default settings
     xSemaphoreTake(renderer.LOCK, portMAX_DELAY);
-    renderer.LEDCOUNT = 15;
+    renderer.LEDCOUNT = 30;
     renderer.PIN = LED_PIN;
-    renderer.DELAY = 100;
-    renderer.REPEATDELAY = 2500;
+    renderer.DELAY = 50;
+    renderer.REPEATDELAY = 500;
     renderer.SPEED = 1;
-    renderer.PEAKBRIGHTNESS = 0.25;
+    renderer.PEAKBRIGHTNESS = 0.5;
     renderer.REPEAT = true;
     renderer.MODE = "NONE";
     renderer.RUNNING = false;
@@ -46,7 +46,7 @@ void setup() {
     vTaskDelay(200);
 
     // Start with a breathing animation - use stack-based variable and pass by reference
-    Animation* breathe = createGrowUpAnimation(renderer.LEDCOUNT, 100);
+    Animation* breathe = createCirclingBrightDotAnimation(renderer.LEDCOUNT, false, true, 4, 100);
     renderer.setAnimation(*breathe);
     delete breathe;  // Clean up our animation after copying its data
     debugln("About to start render task");

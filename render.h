@@ -284,6 +284,37 @@ Animation* createGrowDownAnimation(uint8_t ledCount, uint8_t brightness, uint8_t
  */
 Animation* createHalfFadeAnimation(uint8_t ledCount, float dimLevel = 0.2, bool gradientFade = false);
 
+/**
+ * Create a new pulse animation with quick rise and slow decay
+ * @param ledCount The number of LEDs in the strip
+ * @param minBrightness The minimum brightness (0.0-1.0)
+ * @param maxBrightness The maximum brightness (0.0-1.0)
+ * @param attackProportion What fraction of the cycle is the attack (0.0-1.0)
+ * @param frequency Relative speed of the animation (higher = faster)
+ * @return Animation* Pointer to the created animation
+ */
+Animation* createPulseAnimation(uint8_t ledCount, 
+                                float minBrightness = 0.015, 
+                                float maxBrightness = 0.30,
+                                float attackProportion = 0.15,
+                                float frequency = 1.5);
+
+
+/**
+ * Create an animation where a bright dot circles around the LED strip
+ * @param ledCount The number of LEDs in the strip
+ * @param abruptFade If false, the dot has a faded trail; if true, it's just a single dot
+ * @param clockwise Direction of movement (true = clockwise, false = counterclockwise)
+ * @param trailLength Number of LEDs in the trail (ignored if abruptFade is true)
+ * @param brightness Maximum brightness of the dot (0-255)
+ * @return Animation* Pointer to the created animation
+ */
+Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
+    bool abruptFade,
+    bool clockwise,
+    uint8_t trailLength,
+    uint8_t brightness);
+
 
 /**
  * Render the current animation with the given renderer settings.
