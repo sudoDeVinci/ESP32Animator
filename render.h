@@ -310,11 +310,25 @@ Animation* createPulseAnimation(uint8_t ledCount,
  * @return Animation* Pointer to the created animation
  */
 Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
-    bool abruptFade,
-    bool clockwise,
-    uint8_t trailLength,
-    uint8_t brightness);
+                                            bool abruptFade,
+                                            bool clockwise,
+                                            uint8_t trailLength,
+                                            uint8_t brightness);
 
+/**
+ * Create an animation where a dark spot circles around a fully lit LED strip
+ * @param ledCount The number of LEDs in the strip
+ * @param abruptTransition If false, the spot has a gradual edge; if true, it's a sharp dark spot
+ * @param clockwise Direction of movement (true = clockwise, false = counterclockwise)
+ * @param spotWidth Width of the dark spot in LEDs (wider with gradual transitions)
+ * @param backgroundBrightness Brightness of the lit background (0-255)
+ * @return Animation* Pointer to the created animation
+ */
+Animation* createCirclingDarkSpotAnimation(uint8_t ledCount,
+                                           bool abruptTransition,
+                                           bool clockwise,
+                                           uint8_t spotWidth,
+                                           uint8_t backgroundBrightness);
 
 /**
  * Render the current animation with the given renderer settings.

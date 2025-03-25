@@ -864,7 +864,97 @@ Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
 
 
 
+/**
+ * Create an animation where a dark spot circles around a fully lit LED strip
+ * @param ledCount The number of LEDs in the strip
+ * @param abruptTransition If false, the spot has a gradual edge; if true, it's a sharp dark spot
+ * @param clockwise Direction of movement (true = clockwise, false = counterclockwise)
+ * @param spotWidth Width of the dark spot in LEDs (wider with gradual transitions)
+ * @param backgroundBrightness Brightness of the lit background (0-255)
+ * @return Animation* Pointer to the created animation
+ */
+Animation* createCirclingDarkSpotAnimation(uint8_t ledCount,
+                                          bool abruptTransition,
+                                          bool clockwise,
+                                          uint8_t spotWidth,
+                                          uint8_t backgroundBrightness) {
+    Animation* animation = new Animation("Circling Dark Spot");
+    
+    // Use the same frame count as the bright dot animation for consistency
+    int frameCount = ledCount;
+    
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames->reserve(frameCount);
+    
+    // For each frame in the animation
+    for (int frame = 0; frame < frameCount - 2 ; frame++) {
+        std::vector<std::array<uint8_t, 4>> frameData;
+        frameData.reserve(ledCount); // Reserve space for all LEDs
+        
+        // Calculate the current position (same method as bright dot)
+        float position = ((float)frame / 1.0f);
+        
+        // Reverse direction if counter-clockwise
+        if (!clockwise) {
+            position = ledCount - position;
+        }
+        
+        // Calculate the main dark spot position
+        float mainPosition = fmod(position, ledCount);
+        int mainLed = (int)mainPosition;
+        
+        // For each LED in the strip
+        for (int led = 0; led < ledCount; led++) {
+            uint8_t ledBrightness = backgroundBrightness;
+            
+            // Calculate how dark this LED should be
+            if (abruptTransition) {
+                // Sharp transition - just make the exact spot dark
+                if (led == mainLed) {
+                    ledBrightness = 0; // Completely dark
+                }
+            } else {
+                // Calculate distance to dark spot center, accounting for strip wrapping
+                int distance;
+                
+                // Using the same wrapping approach as in bright dot
+                if (clockwise) {
+                    distance = (led - mainLed + ledCount) % ledCount;
+                    if (distance > ledCount/2) distance = ledCount - distance;
+                } else {
+                    distance = (mainLed - led + ledCount) % ledCount;
+                    if (distance > ledCount/2) distance = ledCount - distance;
+                }
+                
+                // If this LED is within the spot width
+                if (distance < spotWidth) {
+                    // Use the same exponential approach but inverted for darkness
+                    // The closer to center, the darker it gets
+                    float darknessFactor = (float)distance / spotWidth;
+                    
+                    // Exponential falloff - similar to trailBrightness calculation in bright dot
+                    ledBrightness = backgroundBrightness * min(1.0, pow(darknessFactor, 2));
+                }
+            }
+            
+            // Create pixel data
+            std::array<uint8_t, 4> pixel = {
+                static_cast<uint8_t>(led),
+                ledBrightness,
+                ledBrightness,
+                ledBrightness
+            };
+            frameData.push_back(pixel);
+        }
+        
+        frames->push_back(frameData);
+    }
 
+    xSemaphoreGive(animation->LOCK);
+    debugln("Circling Dark Spot animation created with " + String(frameCount) + " frames");
+    return animation;
+}
 
 
 
