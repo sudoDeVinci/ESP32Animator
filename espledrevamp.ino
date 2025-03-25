@@ -46,7 +46,7 @@ void setup() {
     vTaskDelay(200);
 
     // Start with a breathing animation - use stack-based variable and pass by reference
-    Animation* breathe = createCirclingBrightDotAnimation(renderer.LEDCOUNT, false, true, 4, 100);
+    Animation* breathe = createCirclingBrightDotAnimation(renderer.LEDCOUNT, false, true, 3, 100);
     renderer.setAnimation(*breathe);
     delete breathe;  // Clean up our animation after copying its data
     debugln("About to start render task");

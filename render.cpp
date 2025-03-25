@@ -817,7 +817,6 @@ Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
         // Calculate brightness for fractional position (interpolation between LEDs)
         float fractional = mainPosition - mainLed;
         uint8_t currentBrightness = brightness;
-        uint8_t nextBrightness = brightness * (1.0f - fractional);
         
         // Add the main bright dot
         std::array<uint8_t, 4> mainPixel = {
@@ -827,15 +826,6 @@ Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
             currentBrightness
         };
         frameData.push_back(mainPixel);
-        
-        // Add the next LED for smooth movement (interpolation)
-        std::array<uint8_t, 4> nextPixel = {
-            static_cast<uint8_t>((mainLed + 1) % ledCount),
-            nextBrightness,
-            nextBrightness,
-            nextBrightness
-        };
-        frameData.push_back(nextPixel);
         
         // Add trail if not using abrupt fade
         if (!abruptFade) {
@@ -849,8 +839,7 @@ Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
                 }
                 
                 // Calculate trail brightness - exponential decay
-                float trailFactor = exp(-(float)i * 0.4f);
-                uint8_t trailBrightness = currentBrightness * trailFactor;
+                uint8_t trailBrightness = currentBrightness * pow(0.20f, i);
                 
                 // Skip if trail is too dim
                 if (trailBrightness < 5) continue;
