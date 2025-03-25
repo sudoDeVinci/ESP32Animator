@@ -1,0 +1,560 @@
+#include "render.h"
+
+/**
+ * Render the current animation with the given renderer settings.
+ * @param rend The renderer to use
+ */
+void render(Renderer* rend) {
+
+    debugln(">> Started render task");
+
+    xSemaphoreTake(rend->LOCK, portMAX_DELAY);
+    
+    // Early safety checks
+    if (rend == nullptr) return;
+    
+    debugln(">> Checking if animation is running");
+    if (!rend->RUNNING) {
+        debugln(">> No animation to render or simply not running");
+        xSemaphoreGive(rend->LOCK);
+        return;
+    }
+
+    // Check if the current animation is empty
+    debugln(">> Checking if current animation is empty");
+    xSemaphoreTake(rend->CURRENTANIMATION.LOCK, portMAX_DELAY);
+    if (rend->CURRENTANIMATION.FRAMES->empty()) {
+        debugln(">> Current animation is empty, stopping render");
+        xSemaphoreGive(rend->CURRENTANIMATION.LOCK);
+        xSemaphoreGive(rend->LOCK);
+        return;
+    }
+    xSemaphoreGive(rend->CURRENTANIMATION.LOCK);
+
+    debugln(">> Taking stock of settings and animation data");
+    
+    // Create local copies of all settings
+    bool isRunning = rend->RUNNING;
+    bool repeat = rend->REPEAT;
+    float brightness = rend->PEAKBRIGHTNESS;
+    uint16_t delay = rend->DELAY;
+    float speed = rend->SPEED;
+    uint8_t ledCount = rend->LEDCOUNT;
+
+    // Local copies of the current animation data
+    debugln(">> Copying current animation data");
+    xSemaphoreTake(rend->CURRENTANIMATION.LOCK, portMAX_DELAY);
+    String currentName = rend->CURRENTANIMATION.NAME;
+    String previousName  = currentName;    
+    // Make a FULL copy of just the current frame data to prevent
+    // any possibility of accessing freed memory
+    debugln(">> Copying frame data");
+    std::vector<std::vector<std::array<uint8_t, 4>>> frames(*(rend ->CURRENTANIMATION.FRAMES));
+    std::vector<std::array<uint8_t, 4>> frame = frames[0];
+    size_t frameCount = frames.size();
+    size_t frameSize = frames[0].size();
+    xSemaphoreGive(rend->CURRENTANIMATION.LOCK);
+    xSemaphoreGive(rend->LOCK);
+
+    debugln(">> Starting render loop");
+
+    // Loop through all frames
+    for (size_t frameIdx = 0; frameIdx < frameCount && isRunning; frameIdx++) {
+        // Get the current frame settings
+        debugln(">> Getting current frame settings");
+        xSemaphoreTake(rend->LOCK, portMAX_DELAY);
+        isRunning = rend->RUNNING;
+        repeat = rend->REPEAT;
+        brightness = rend->PEAKBRIGHTNESS;
+        delay = rend->DELAY;
+        speed = rend->SPEED;
+        currentName = rend->CURRENTANIMATION.getName();
+        ledCount = rend->LEDCOUNT;
+        xSemaphoreGive(rend->LOCK);
+
+        // Check if the animation has changed
+        if (currentName != previousName) {
+            debugln(">> Animation changed, stopping render");
+            break;
+        }
+
+        // Check if the animation has stopped
+        if (!isRunning) {
+            debugln(">> Animation stopped, stopping render");
+            break;
+        }
+
+        // Clear the screen
+        debugln(">> Clearing screen");
+        rend -> clearScreen();
+
+        debugln(">> Rendering frame " + String(frameIdx) + " of " + String(frameCount));
+        frame = frames[frameIdx];
+        frameSize = frame.size();
+
+        for (size_t pixelIdx = 0; pixelIdx < frameSize; pixelIdx++) {
+            std::array<uint8_t, 4> pixel = frame[pixelIdx];
+            if (pixel[0] > ledCount) continue;
+
+            // debugln(">> Setting pixel " + String(pixel[0]) + " to " + String(pixel[1]) + ", " + String(pixel[2]) + ", " + String(pixel[3]));
+            rend->setPixelColor(pixel[0],
+                static_cast<uint8_t>(pixel[1]),
+                static_cast<uint8_t>(pixel[2]),
+                static_cast<uint8_t>(pixel[3])
+            );
+        }
+        
+        
+        xSemaphoreTake(rend->LOCK, portMAX_DELAY);
+        debugln(">> Showing screen");
+        rend->SCREEN.show();
+        xSemaphoreGive(rend->LOCK);
+
+        previousName = currentName;
+
+        debugln(">> Delaying for " + String(delay / speed) + "ms");
+        // Delay for the frame duration
+        vTaskDelay(delay / speed);
+
+    }
+
+    // Repeat the animation if necessary
+    if (!rend -> REPEAT) rend -> setRunning(false);
+}
+
+
+/**
+ * Create a new breathing animation
+ * WARNING: Animation is dynamically allocated and must be freed.
+ * @param ledCount The number of LEDs in the strip
+ * @param minBrightness The minimum brightness
+ * @param maxBrightness The maximum brightness
+ * @param frequency The frequency of the breathing
+ * @return The new animation
+ */
+Animation* createBreatheAnimation(uint8_t ledCount,
+                                float minBrightness,
+                                float maxBrightness,
+                                int frequency) {
+    debugln(">> Creating breathe animation");
+    Animation* animation = new Animation("Breathe");
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    const int frameCount = 90;
+
+    debugln("Reserving memory for frames");
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    frames->reserve(frameCount);
+    
+    for (int i = 0; i < frameCount; i++) {
+        debugln("Creating frame " + String(i) + " of " + String(frameCount));
+        // Use an eased sine wave for more natural breathing
+        float t = (float)i / frameCount;
+        float easedT = 0.5f - 0.5f * cos(t * PI * 2);
+        
+        // Map to brightness range
+        float brightness = minBrightness + (maxBrightness - minBrightness) * easedT;
+
+        // Set all LEDs to the calculated brightness
+        uint8_t pixelval = static_cast<uint8_t>(brightness * 255);
+
+        // Create a new frame vector for this frame
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);  // Reserve space for all LEDs
+        
+        debugln("Creating pixel data for frame " + String(i));
+        for (int led = 0; led < ledCount; led++) {
+            std::array<uint8_t, 4> pixel = {
+                static_cast<uint8_t>(led),
+                pixelval,
+                pixelval,
+                pixelval
+            };
+            frame.push_back(pixel);  // Add pixel to the frame
+        }
+        
+        // Add the complete frame to the frames vector
+        frames->push_back(frame);
+    }
+    
+    xSemaphoreGive(animation->LOCK);
+    debugln("Breathe animation created - returning pointer");
+    return animation;
+}
+
+
+/**
+ * Create a new growing bar animation
+ * WARNING: Animation is dynamically allocated and must be freed.
+ * @param ledCount The number of LEDs in the strip
+ * @param startHeight The starting height of the bar
+ * @param endHeight The ending height of the bar
+ * @param abruptFade If true, the bar will abruptly fade in and out
+ * @return The new animation
+ */
+Animation* createGrowingBarAnimation(uint8_t ledCount,
+                                     uint8_t maxBrightness,
+                                     uint8_t startHeight,
+                                     uint8_t endHeight,
+                                     bool abruptFade) {
+    Animation* animation = new Animation("Growing Bar");   
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+
+    // Default values if not specified
+    if (startHeight == 0) startHeight = max(1, (int)(ledCount * 0.1));
+    if (endHeight == 0) endHeight = ledCount;
+    
+    int middleLed = ledCount / 2;
+
+    debugln(">> Allocating space for all frames");
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    frames->reserve(endHeight - startHeight + 5);
+    debugln(">> Creating frames for growing bar animation");
+
+    for (int height = startHeight; height <= endHeight; height++) {
+        debugln(">> Allocating frame for height " + String(height) + " of " + String(endHeight));
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);
+        int halfHeight = height / 2;
+
+        for (int led = 0; led < ledCount; led++) {
+            // Determine if this LED should be lit (within the growing bar)
+            bool withinBar = (led >= middleLed - halfHeight && led <= middleLed + halfHeight);
+
+            if (withinBar || !abruptFade) {
+                // Calculate brightness based on whether LED is in the bar
+                uint8_t brightness = withinBar ? maxBrightness : 0;
+                
+                // For soft fade, calculate a gradient based on distance from the bar edge
+                if (!abruptFade && !withinBar) {
+                    int distance = min(
+                        abs(led - (middleLed - halfHeight)),
+                        abs(led - (middleLed + halfHeight))
+                    );
+                    brightness = max(0, maxBrightness - (distance * 5)); // Fade over ~5 LEDs
+                }
+                
+                std::array<uint8_t, 4> pixel = {
+                    static_cast<uint8_t>(led),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness)
+                };
+
+                debugln(">> Adding pixel to frame");
+                frame.push_back(pixel);
+            }
+        }
+
+        debugln(">> Adding frame to frames");
+        frames->push_back(frame);
+    }
+
+    xSemaphoreGive(animation->LOCK);
+
+    debugln(">> Growing bar animation created - returning pointer");
+    return animation;
+}
+
+
+/**
+ * @brief Creates a shrinking bar animation
+ * @param ledCount Number of LEDs in the strip
+ * @param startHeight Starting height of the bar (0 = auto)
+ * @param endHeight Ending height of the bar (0 = auto)
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with shrinking bar effect
+ * @details A bright bar shrinks from full height to the center
+ */
+Animation* createShrinkingBarAnimation(uint8_t ledCount,
+                                       uint8_t maxBrightness,
+                                       uint8_t startHeight,
+                                       uint8_t endHeight,
+                                       bool abruptFade) {
+    Animation* animation = new Animation("Shrinking Bar");
+    
+    // Default values if not specified
+    if (startHeight == 0) startHeight = ledCount;
+    if (endHeight == 0) endHeight = max(1, (int)(ledCount * 0.1));
+
+    int middleLed = ledCount / 2;
+
+    debugln(">> Allocating space for all frames");
+    debugln("Reserving memory for frames");
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    size_t we = startHeight - endHeight + 5;
+    debugf(">>Attempting to reserve frame vector of %d\n", we);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames->reserve(we);
+    debugln(">> Creating frames for shrinking bar animation");
+
+    for (int height = startHeight; height >= endHeight; height--) {
+        debugln(">> Allocating frame for height " + String(height) + " of " + String(endHeight));
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);
+        int halfHeight = height / 2;
+
+        for (int led = 0; led < ledCount; led++) {
+            // Determine if this LED should be lit (within the shrinking bar)
+            bool withinBar = (led >= middleLed - halfHeight && led <= middleLed + halfHeight);
+            
+            if (withinBar || !abruptFade) {
+                // Calculate brightness based on whether LED is in the bar
+                uint8_t brightness = withinBar ?  maxBrightness : 0;
+                
+                // For soft fade, calculate a gradient based on distance from the bar edge
+                if (!abruptFade && !withinBar) {
+                    int distance = min(
+                        abs(led - (middleLed - halfHeight)),
+                        abs(led - (middleLed + halfHeight))
+                    );
+                    brightness = max(0,  maxBrightness - (distance * 5)); // Fade over ~5 LEDs
+                }
+                
+                std::array<uint8_t, 4> pixel = {
+                    static_cast<uint8_t>(led),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness)
+                };
+
+                debugln(">> Adding pixel to frame");
+                frame.push_back(pixel);
+            }
+        }
+        debugln(">> Adding frame to frames");
+        frames->push_back(frame);
+    }
+    xSemaphoreGive(animation->LOCK);
+
+    debugln(">> Shrinking bar animation created - returning pointer");
+    return animation;
+}
+
+
+/**
+ * @brief Creates an extending bar animation
+ * @param ledCount Number of LEDs in the strip
+ * @param endDistance Maximum distance from center (0 = auto)
+ * @param abruptFade If true, bar has sharp edges; if false, edges fade
+ * @return Animation object with extending bar effect
+ * @details A bright line starts at the middle and extends symmetrically
+ */
+Animation* createExtendingBarAnimation(uint8_t ledCount,
+                                       uint8_t maxBrightness,
+                                       uint8_t endDistance,
+                                       bool abruptFade) {
+    
+    Animation* animation = new Animation("Extending Bar");
+    
+    // Default value if not specified
+    if (endDistance == 0) endDistance = ledCount / 2;
+    int middleLed = ledCount / 2;
+
+    debugln(">> Allocating space for all frames");
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames->reserve(endDistance + 1);
+    debugln(">> Creating frames for extending bar animation");
+
+    
+    for (int extent = 0; extent <= endDistance; extent++) {
+        debugln(">> Allocating frame for extent " + String(extent) + " of " + String(endDistance));
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);
+        
+        for (int led = 0; led < ledCount; led++) {
+            // Determine if this LED should be lit (within the extending bar)
+            bool withinBar = (led >= middleLed - extent && led <= middleLed + extent);
+            
+            if (withinBar || !abruptFade) {
+                // Calculate brightness based on whether LED is in the bar
+                uint8_t brightness = withinBar ? maxBrightness : 0;
+                
+                // For soft fade, calculate a gradient based on distance from the bar edge
+                if (!abruptFade && !withinBar) {
+                    int distance = min(
+                        abs(led - (middleLed - extent)),
+                        abs(led - (middleLed + extent))
+                    );
+                    brightness = max(0, maxBrightness - (distance * 25)); // Fade over ~5 LEDs
+                }
+                
+                std::array<uint8_t, 4> pixel = {
+                    static_cast<uint8_t>(led),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness)
+                };
+                debugln(">> Adding pixel to frame");
+                frame.push_back(pixel);
+            }
+        }
+        
+        debugln(">> Adding frame to frames");
+        frames->push_back(frame);
+    }
+    
+    xSemaphoreGive(animation->LOCK);
+
+    debugln(">> Extending bar animation created - returning pointer");
+    return animation;
+}
+
+
+/**
+ * 
+ */
+Animation* createExtinguishingBarAnimation(uint8_t ledCount,
+                                           uint8_t maxBrightness,
+                                           uint16_t retentionTime,
+                                           bool abruptFade) {
+
+    Animation* animation = new Animation("Extinguishing Bar");
+
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+
+    int middleLed = ledCount / 2;
+    
+    debugln(">> Allocating space for all frames");
+    frames->reserve(middleLed + 20);
+    debugln(">> Creating frames for growing bar animation");
+
+    std::vector<std::array<uint8_t, 4>> allOnFrame;
+    allOnFrame.reserve(ledCount);
+
+    for (int led = 0; led < ledCount; led ++) {
+        std::array<uint8_t, 4> pixel = {
+            (uint8_t)led,
+            maxBrightness,
+            maxBrightness,
+            maxBrightness
+        };
+        allOnFrame.push_back(pixel);
+    };
+
+    frames -> push_back(allOnFrame);
+
+    for (int extent = middleLed; extent >= 0; extent--) {
+        debugf(">> Reserving space for frame %d of %d", (middleLed - extent, middleLed));
+        std::vector<std::array<uint8_t, 4>> frame;
+        frame.reserve(ledCount);
+
+        for (int led = 0; led < ledCount; led++) {
+            // Determine if this LED should be lit (within the contracting bar)
+            bool withinBar = (led >= middleLed - extent && led <= middleLed + extent);
+            
+            if (withinBar || !abruptFade) {
+                // Calculate brightness based on whether LED is in the bar
+                uint8_t brightness = withinBar ? maxBrightness : 0;
+                
+                // For soft fade, calculate a gradient based on distance from the bar edge
+                if (!abruptFade && !withinBar) {
+                    int distance = min(
+                        abs(led - (middleLed - extent)),
+                        abs(led - (middleLed + extent))
+                    );
+                    brightness = max(0, maxBrightness - (distance * 25)); // Fade over ~5 LEDs
+                }
+                
+                std::array<uint8_t, 4> pixel = {
+                    static_cast<uint8_t>(led),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness),
+                    static_cast<uint8_t>(brightness)
+                };
+                debugln(">> Adding pixel to frame");
+                frame.push_back(pixel);
+            }
+        }
+        debugln("Adding frame to frames");
+        frames -> push_back(frame);
+    }
+
+    // Add retention time by duplicating the last frame
+    debugln(">> Defining retention frame");
+    if (retentionTime > 0) {
+        std::vector<std::array<uint8_t, 4>> retentionFrame;
+        std::array<uint8_t, 4> pixel = {
+            (uint8_t)middleLed,  // LED index
+            maxBrightness,                 // R
+            maxBrightness,                 // G
+            maxBrightness                  // B
+        };
+
+        retentionFrame.push_back(pixel);
+        
+        // Add retention frame multiple times based on time
+        debugln(">> Adding retention full frames");
+        uint16_t retentionFrames = static_cast<uint8_t>(retentionTime / 100); // Assuming 100ms per frame
+        for (uint16_t i = 0; i < retentionFrames; i++) {
+            std::vector<std::array<uint8_t, 4>> retframe(retentionFrame);
+            frames -> push_back(retframe);
+        }
+    }
+
+    // Final frame with all LEDs off
+    debugln(">> Defining final frame");
+    std::vector<std::array<uint8_t, 4>> allOffFrame;
+    for (int led = 0; led < ledCount; led++) {
+        std::array<uint8_t, 4> pixel = {
+            (uint8_t)led,    // LED index
+            0,               // R
+            0,               // G
+            0                // B
+        };
+        allOffFrame.push_back(pixel);
+    }
+
+    debugln(">> Adding rentention off frames");
+    frames -> push_back(allOffFrame);
+
+    xSemaphoreGive(animation->LOCK);
+    
+    debugln(">> Extinguishing Bar animation created - returning pointer");
+    return animation;
+}
+
+
+/**
+ * This requires button input so we only render the first frame.
+ */
+Animation* createMovingBarAnimation(uint8_t ledCount, uint8_t brightness, uint8_t barSize) {
+    Animation* animation = new Animation("Moving Bar");
+
+    xSemaphoreTake(animation->LOCK, portMAX_DELAY);
+    std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
+    frames -> reserve(1);
+
+    std::vector<std::array<uint8_t, 4>> frame;
+
+    if (barSize == 0) barSize = 1;
+    
+    int middleLed = ledCount / 2;
+
+    for (int i = 0; i < barSize; i++) {
+        int led = middleLed - barSize/2 + i;
+        if (led >= 0 && led < ledCount) {
+            std::array<uint8_t, 4> pixel = {
+                (uint8_t)led,    // LED index
+                brightness,             // R
+                brightness,             // G
+                brightness              // B
+            };
+            frame.push_back(pixel);
+        }
+    }
+    frames -> push_back(frame);
+    xSemaphoreGive(animation->LOCK);
+
+    return animation;
+}
+
+
+Animation createGrowUpAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance, bool abruptFade) {
+    Animation animation;
+
+
+
+
+
