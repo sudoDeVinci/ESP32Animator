@@ -34,19 +34,6 @@ class MenuSystem {
         bool needsRedraw;            // Flag to indicate menu needs redrawing
         unsigned long lastInputTime; // Timestamp of last user input
 
-        /**
-         * @brief Displays the appropriate menu based on current state
-         * @details Routes to the correct display method based on currentState
-         */
-        void displayCurrentMenu();
-        
-        /**
-         * @brief Processes user input based on current menu state
-         * @param input The character input from serial
-         * @details Routes to the correct input processor based on currentState
-         */
-        void processInput(char input);
-
         // Menu display methods
         /**
          * @brief Displays the main menu options
@@ -88,48 +75,18 @@ class MenuSystem {
          */
         void displaySystemInfo();
 
-        // Input processing methods
+        void displayCurrentMenu();
+
         /**
          * @brief Processes input for the main menu
          * @param input The character input from serial
          */
-        void processMainMenuInput(char input);
-        
-        /**
-         * @brief Processes input for the animation selection menu
-         * @param input The character input from serial
-         */
-        void processAnimationMenuInput(char input);
-        
-        /**
-         * @brief Processes input for the brightness settings menu
-         * @param input The character input from serial
-         */
-        void processBrightnessMenuInput(char input);
-        
-        /**
-         * @brief Processes input for the speed settings menu
-         * @param input The character input from serial
-         */
-        void processSpeedMenuInput(char input);
-        
-        /**
-         * @brief Processes input for the LED count settings menu
-         * @param input The character input from serial
-         */
-        void processLEDCountMenuInput(char input);
-        
-        /**
-         * @brief Processes input for the repeat settings menu
-         * @param input The character input from serial
-         */
-        void processRepeatMenuInput(char input);
-        
-        /**
-         * @brief Processes input for the mode settings menu
-         * @param input The character input from serial
-         */
-        void processModeMenuInput(char input);
+        void processMainMenuInput(String input);
+
+        void processInput(String input);
+
+        void processAnimationMenuInput(String input);
+
     public:
         /**
          * @brief Set the current menu state to MAIN and trigger a redraw.
@@ -153,67 +110,5 @@ class MenuSystem {
          */
         void forceRedraw() { needsRedraw = true; }
 };
-
-// Button handling functions
-/**
- * @brief Handles button press events based on interactive mode
- * @param upButtonPressed Reference to up button pressed state
- * @param downButtonPressed Reference to down button pressed state
- * @param renderer Pointer to the LED renderer
- * @details Routes to the appropriate handler based on the current MODE setting
- */
-void handleButtonPress(volatile bool &upButtonPressed, volatile bool &downButtonPressed, Renderer* renderer);
-
-/**
- * @brief Applies the moving bar animation based on button presses
- * @param renderer Pointer to the LED renderer
- * @param upPressed True if up button was pressed
- * @param downPressed True if down button was pressed
- * @details Moves a light bar up or down based on button input
- */
-void applyMovingBarAnimation(Renderer* renderer, bool upPressed, bool downPressed);
-
-/**
- * @brief Applies the growing bar animation based on button presses
- * @param renderer Pointer to the LED renderer
- * @param upPressed True if up button was pressed
- * @param downPressed True if down button was pressed
- * @details Grows or shrinks a centered light bar based on button input
- */
-void applyGrowingBarAnimation(Renderer* renderer, bool upPressed, bool downPressed);
-
-/**
- * @brief Applies the extending bar animation based on button presses
- * @param renderer Pointer to the LED renderer
- * @param upPressed True if up button was pressed
- * @param downPressed True if down button was pressed
- * @details Extends or contracts a centered light bar based on button input
- */
-void applyExtendingBarAnimation(Renderer* renderer, bool upPressed, bool downPressed);
-
-/**
- * @brief Applies the half fade animation based on button presses
- * @param renderer Pointer to the LED renderer
- * @param upPressed True if up button was pressed
- * @param downPressed True if down button was pressed
- * @details Fades top or bottom half of LEDs based on button input
- */
-void applyHalfFadeAnimation(Renderer* renderer, bool upPressed, bool downPressed);
-
-/**
- * @brief Applies the grow up animation based on button press
- * @param renderer Pointer to the LED renderer
- * @param upPressed True if up button was pressed
- * @details Grows light upward from middle when up button is pressed
- */
-void applyGrowUpAnimation(Renderer* renderer, bool upPressed);
-
-/**
- * @brief Applies the grow down animation based on button press
- * @param renderer Pointer to the LED renderer
- * @param downPressed True if down button was pressed
- * @details Grows light downward from middle when down button is pressed
- */
-void applyGrowDownAnimation(Renderer* renderer, bool downPressed);
 
 #endif // CLI_H

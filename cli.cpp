@@ -5,26 +5,33 @@
  * Main update loop for menu system
  */
 void MenuSystem::update() {
+    String outstr = "";
     // Check for user input
-    if (Serial.available()) {
-      char input = Serial.read();
-      
-      // Consume any extra newlines or carriage returns
-      while (Serial.available() && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
+    while (Serial.available() > 0) {
+        //small delay to allow input buffer to fill
+        vTaskDelay(20);
+        char input = Serial.read();
+
+        // Consume any extra newlines or carriage returns
+        while (Serial.available() && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
         Serial.read();
-      }
-      
-      if (input >= ' ' && input <= '~') {  // Printable characters
-        this -> processInput(input);
-        lastInputTime = millis();
-        this -> needsRedraw = true;
-      }
+        }
+
+        outstr += input;
     }
-    
-    // Display menu if needed
+
+    if (outstr.length() > 0) {
+        Serial.println(">> Processing input: " + outstr);
+        Serial.println(">> Length: " + String(outstr.length()));
+
+        this -> lastInputTime = millis();
+        this -> processInput(outstr);
+        this -> needsRedraw = true;
+    }
+
     if (needsRedraw) {
-      this -> displayCurrentMenu();
-      this -> needsRedraw = false;
+        this -> displayCurrentMenu();
+        needsRedraw = false;
     }
 }
 
@@ -38,6 +45,7 @@ void MenuSystem::update() {
  * Display main menu options
  */
 void MenuSystem::displayMainMenu() {
+    xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
     Serial.println("\nMain Menu:");
     Serial.println("1. Select Animation");
     Serial.println("2. Adjust Brightness (Current: " + String(renderer->PEAKBRIGHTNESS) + ")");
@@ -47,6 +55,7 @@ void MenuSystem::displayMainMenu() {
     Serial.println("6. Set Interactive Mode (Current: " + String(renderer->MODE ? renderer->MODE : "NONE") + ")");
     Serial.println("7. System Information");
     Serial.println("\nEnter selection (1-7):");
+    xSemaphoreGive(renderer->LOCK);
   }
   
   /**
@@ -74,6 +83,7 @@ void MenuSystem::displayMainMenu() {
    * Display brightness settings menu
    */
   void MenuSystem::displayBrightnessMenu() {
+    xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
     Serial.println("\nAdjust Brightness:");
     Serial.println("Current brightness: " + String(renderer->PEAKBRIGHTNESS));
     Serial.println("1. 10%");
@@ -84,12 +94,14 @@ void MenuSystem::displayMainMenu() {
     Serial.println("6. Custom value");
     Serial.println("0. Return to Main Menu");
     Serial.println("\nEnter selection (0-6):");
+    xSemaphoreGive(renderer->LOCK);
   }
   
   /**
    * Display speed settings menu
    */
   void MenuSystem::displaySpeedMenu() {
+    xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
     Serial.println("\nSet Animation Speed:");
     Serial.println("Current speed: " + String(renderer->SPEED) + "x");
     Serial.println("1. 0.25x (Slow)");
@@ -100,12 +112,14 @@ void MenuSystem::displayMainMenu() {
     Serial.println("6. Custom value");
     Serial.println("0. Return to Main Menu");
     Serial.println("\nEnter selection (0-6):");
+    xSemaphoreGive(renderer->LOCK);
   }
   
   /**
    * Display LED count settings menu
    */
   void MenuSystem::displayLEDCountMenu() {
+    xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
     Serial.println("\nSet LED Count:");
     Serial.println("Current count: " + String(renderer->LEDCOUNT));
     Serial.println("1. 30 LEDs");
@@ -115,24 +129,28 @@ void MenuSystem::displayMainMenu() {
     Serial.println("5. Custom count");
     Serial.println("0. Return to Main Menu");
     Serial.println("\nEnter selection (0-5):");
+    xSemaphoreGive(renderer->LOCK);
   }
   
   /**
    * Display repeat settings menu
    */
   void MenuSystem::displayRepeatMenu() {
+    xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
     Serial.println("\nToggle Animation Repeat:");
     Serial.println("Current setting: " + String(renderer->REPEAT ? "ON" : "OFF"));
     Serial.println("1. Enable Repeat");
     Serial.println("2. Disable Repeat");
     Serial.println("0. Return to Main Menu");
     Serial.println("\nEnter selection (0-2):");
+    xSemaphoreGive(renderer->LOCK);
   }
   
   /**
    * Display mode settings menu
    */
   void MenuSystem::displayModeMenu() {
+    xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
     Serial.println("\nSet Interactive Mode:");
     Serial.println("Current mode: " + String(renderer->MODE ? renderer->MODE : "NONE"));
     Serial.println("1. Moving Bar (use buttons to move light bar)");
@@ -144,12 +162,15 @@ void MenuSystem::displayMainMenu() {
     Serial.println("7. Disable Interactive Mode");
     Serial.println("0. Return to Main Menu");
     Serial.println("\nEnter selection (0-7):");
+    xSemaphoreGive(renderer->LOCK);
   }
   
   /**
    * Display system information
    */
   void MenuSystem::displaySystemInfo() {
+    xSemaphoreTake(this->renderer -> LOCK, portMAX_DELAY);
+    xSemaphoreTake(this->renderer->CURRENTANIMATION.LOCK, portMAX_DELAY);
     Serial.println("\nSystem Information:");
     Serial.println("LED Count: " + String(renderer->LEDCOUNT));
     Serial.println("LED Pin: " + String(renderer->PIN));
@@ -158,7 +179,192 @@ void MenuSystem::displayMainMenu() {
     Serial.println("Repeat: " + String(renderer->REPEAT ? "ON" : "OFF"));
     Serial.println("Repeat Delay: " + String(renderer->REPEATDELAY) + "ms");
     Serial.println("Interactive Mode: " + String(renderer->MODE ? renderer->MODE : "NONE"));
-    Serial.println("Animation: " + String(renderer->CURRENTANIMATION.name ? renderer->CURRENTANIMATION.name : "None"));
+    Serial.println("Animation: " + String(renderer->CURRENTANIMATION.NAME ? renderer->CURRENTANIMATION.NAME : "None"));
     Serial.println("Running: " + String(renderer->RUNNING ? "YES" : "NO"));
     Serial.println("\nPress 0 to return to Main Menu:");
+    xSemaphoreGive(this->renderer->CURRENTANIMATION.LOCK);
+    xSemaphoreGive(this->renderer->LOCK);
 }
+
+/**
+ * Display appropriate menu based on current state
+ */
+void MenuSystem::displayCurrentMenu() {
+    // Clear screen with a bunch of newlines
+    Serial.println("\n\n\n\n");
+    
+    // Title header
+    Serial.println("=== ESP32 LED Controller ===");
+    
+    switch (this->currentState) {
+      case MenuState::MAIN:
+        displayMainMenu();
+        break;
+      case MenuState::ANIMATION_SELECT:
+        displayAnimationMenu();
+        break;
+      case MenuState::BRIGHTNESS_SETTINGS:
+        displayBrightnessMenu();
+        break;
+      case MenuState::SPEED_SETTINGS:
+        displaySpeedMenu();
+        break;
+      case MenuState::LED_COUNT_SETTINGS:
+        displayLEDCountMenu();
+        break;
+      case MenuState::REPEAT_SETTINGS:
+        displayRepeatMenu();
+        break;
+      case MenuState::MODE_SETTINGS:
+        displayModeMenu();
+        break;
+      case MenuState::SYSTEM_INFO:
+        displaySystemInfo();
+        break;
+    }
+  }
+
+/***********************************************************
+ * --------------- MENU SELECTION METHODS ---------------- *
+ ***********************************************************/
+
+/**
+ * Process user input based on current menu state
+ */
+void MenuSystem::processInput(String input) {
+    switch (this->currentState) {
+        case MenuState::MAIN:
+            processMainMenuInput(input);
+            break;
+        case MenuState::ANIMATION_SELECT:
+            processAnimationMenuInput(input);
+            break;
+        /*
+        case MenuState::BRIGHTNESS_SETTINGS:
+            processBrightnessMenuInput(input);
+            break;
+        case MenuState::SPEED_SETTINGS:
+            processSpeedMenuInput(input);
+            break;
+        case MenuState::LED_COUNT_SETTINGS:
+            processLEDCountMenuInput(input);
+            break;
+        case MenuState::REPEAT_SETTINGS:
+            processRepeatMenuInput(input);
+            break;
+        case MenuState::MODE_SETTINGS:
+            processModeMenuInput(input);
+            break;
+        */
+        default:
+            // For any other state, return to main menu
+            this->currentState = MenuState::MAIN;
+            break;
+    }
+  }
+
+void MenuSystem::processMainMenuInput(String input) {
+    // Check if input is a single character
+    if (input.length() == 1) {
+        // Convert the first character to an integer
+        char option = input.charAt(0);
+        
+        switch (option) {
+            case '1':
+                currentState = MenuState::ANIMATION_SELECT;
+                break;
+            case '2':
+                currentState = MenuState::BRIGHTNESS_SETTINGS;
+                break;
+            case '3':
+                currentState = MenuState::SPEED_SETTINGS;
+                break;
+            case '4':
+                currentState = MenuState::LED_COUNT_SETTINGS;
+                break;
+            case '5':
+                currentState = MenuState::REPEAT_SETTINGS;
+                break;
+            case '6':
+                currentState = MenuState::MODE_SETTINGS;
+                break;
+            case '7':
+                currentState = MenuState::SYSTEM_INFO;
+                break;
+            default:
+                // Invalid input, just redraw
+                Serial.println("Invalid option. Please try again.");
+                break;
+        }
+    } else if (input.length() > 1) {
+        // Handle multi-character input, or just inform the user
+        Serial.println("Please enter a single digit (1-7).");
+    }
+}
+
+void MenuSystem::processAnimationMenuInput(String input) {
+    if (input == "0") {
+        this -> currentState = MenuState::MAIN;
+        return;
+    };
+
+    Animation* newAnimation = nullptr;
+    bool validInput = true;
+    xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
+    
+    uint8_t BRIGHTNESS = static_cast<uint8_t>(renderer->PEAKBRIGHTNESS * 255);
+
+    if (input == "1") {
+        newAnimation = createBreatheAnimation(renderer->LEDCOUNT, 0.025, renderer->PEAKBRIGHTNESS, renderer->frequency);
+    } else if (input == "2") {
+        newAnimation = createGrowingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+    } else if (input == "3") {
+        newAnimation = createShrinkingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, 0, 0, true);
+    } else if (input == "4") {
+        newAnimation = createExtendingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+    } else if (input == "5") {
+        newAnimation = createExtinguishingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+    } else if (input == "6") {
+        newAnimation = createMovingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+    } else if (input == "7") {
+        newAnimation = createGrowUpAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+    } else if (input == "8") {
+        newAnimation = createGrowDownAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+    } else if (input == "9") {
+        newAnimation = createHalfFadeAnimation(renderer->LEDCOUNT);
+    } else if (input == "10") {
+        newAnimation = createPulseAnimation(renderer->LEDCOUNT, 0.015, BRIGHTNESS, 0.15, renderer->frequency);
+    } else if (input == "11") {
+        newAnimation = createCirclingBrightDotAnimation(renderer->LEDCOUNT, false, true, 3, 255);
+    } else if (input == "12") {
+        newAnimation = createCirclingDarkSpotAnimation(renderer->LEDCOUNT, false, true, 3, 100);
+    } else {
+        validInput = false;
+    }
+    xSemaphoreGive(renderer->LOCK);
+
+    if (validInput) {
+        renderer->setAnimation(*newAnimation);
+        vTaskDelay(100);
+        delete newAnimation;
+    } else {
+        Serial.println("Invalid option. Please try again.");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

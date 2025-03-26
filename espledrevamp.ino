@@ -1,12 +1,16 @@
 #include "render.h"
+#include "cli.h"
+#include <Arduino.h>
 
 #define LED_PIN 42
 
 // Global renderer
 Renderer renderer;
+MenuSystem menuSystem(&renderer);
 
 // Task handles
 TaskHandle_t renderTaskHandle = NULL;
+TaskHandle_t cliTaskHandle = NULL;
 
 /**
  * Render task: Handles LED animation rendering
@@ -22,6 +26,16 @@ void renderTask(void* parameters) {
 }
 
 /**
+ * Menu task: Handles user input and button presse callbacks
+ */
+void menuTask(void* parameters) {
+  while (true) {
+    menuSystem.update();
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+  }
+}
+
+/**
  * Main setup function
  */
 void setup() {
@@ -31,10 +45,10 @@ void setup() {
 
     // Initialize renderer with default settings
     xSemaphoreTake(renderer.LOCK, portMAX_DELAY);
-    renderer.LEDCOUNT = 30;
+    renderer.LEDCOUNT = 15;
     renderer.PIN = LED_PIN;
     renderer.DELAY = 50;
-    renderer.REPEATDELAY = 500;
+    renderer.REPEATDELAY = 50;
     renderer.SPEED = 1;
     renderer.PEAKBRIGHTNESS = 0.5;
     renderer.REPEAT = true;
@@ -50,7 +64,7 @@ void setup() {
     renderer.setAnimation(*breathe);
     delete breathe;  // Clean up our animation after copying its data
     debugln("About to start render task");
-
+0
     // Create the render task
     xTaskCreatePinnedToCore(
         renderTask,         // Function to run
@@ -60,6 +74,17 @@ void setup() {
         1,                  // Priority
         &renderTaskHandle,  // Task handle;
         0                   // Core to run on
+    );
+
+    // Create the CLI task
+    xTaskCreatePinnedToCore(
+        menuTask,           // Function to run
+        "CLITask",          // Task name
+        2048,              // Stack size (bytes)
+        NULL,               // Task parameters
+        1,                  // Priority
+        &cliTaskHandle,     // Task handle
+        1                   // Core to run on
     );
 }
 

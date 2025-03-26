@@ -136,7 +136,7 @@ void render(Renderer* rend) {
 Animation* createBreatheAnimation(uint8_t ledCount,
                                 float minBrightness,
                                 float maxBrightness,
-                                int frequency) {
+                                float frequency) {
     debugln(">> Creating breathe animation");
     Animation* animation = new Animation("Breathe");
     std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
@@ -888,7 +888,7 @@ Animation* createCirclingDarkSpotAnimation(uint8_t ledCount,
     frames->reserve(frameCount);
     
     // For each frame in the animation
-    for (int frame = 0; frame < frameCount - 2 ; frame++) {
+    for (int frame = 0; frame < frameCount ; frame++) {
         std::vector<std::array<uint8_t, 4>> frameData;
         frameData.reserve(ledCount); // Reserve space for all LEDs
         

@@ -29,7 +29,7 @@ struct Renderer {
     int currentExtent;       // For ExtendingBarAnimation, GrowUpAnimation, GrowDownAnimation
     float topBrightness;     // For HalfFadeAnimation - top half brightness
     float bottomBrightness;  // For HalfFadeAnimation - bottom half brightness
-
+    float frequency;           // For Breathe and Pulse - frequency of the animation
 
     /**
      * @brief Constructor
@@ -41,6 +41,7 @@ struct Renderer {
         currentExtent = 0;
         topBrightness = 1.0;
         bottomBrightness = 1.0;
+        frequency = 1.0;
         // Initialize animation directly - don't create a new one and then copy
         RUNNING = false;
     }
@@ -186,13 +187,13 @@ struct Renderer {
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
  * @param ledCount The number of LEDs in the strip
- * @param minBrightness The minimum brightness
- * @param maxBrightness The maximum brightness
+ * @param minBrightness The minimum brightness coefficient
+ * @param maxBrightness The maximum brightness coefficient
  * @param frequency The frequency of the breathing
  * @return The new animation
  * @details A smooth, sinusoidal increase and decrease in brightness, mimicking breathing.
  */
-Animation* createBreatheAnimation(uint8_t ledCount, float minBrightness = 0.025, float maxBrightness = 1.0, int frequency = 1);
+Animation* createBreatheAnimation(uint8_t ledCount, float minBrightness = 0.025, float maxBrightness = 1.0, float frequency = 1);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -272,7 +273,7 @@ Animation* createGrowUpAnimation(uint8_t ledCount, uint8_t brightness, uint8_t e
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
  * @return Animation object with growing bar effect
  */
-Animation* createGrowDownAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance, bool abruptFade);
+Animation* createGrowDownAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance = 0, bool abruptFade = true);
 
 /**
  * @brief Starts with all LEDs on, and top half dims when “up” button pressed and bottom half dims when “down” button pressed
