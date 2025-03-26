@@ -45,7 +45,7 @@ void setup() {
 
     // Initialize renderer with default settings
     xSemaphoreTake(renderer.LOCK, portMAX_DELAY);
-    renderer.LEDCOUNT = 15;
+    renderer.LEDCOUNT = 20;
     renderer.PIN = LED_PIN;
     renderer.DELAY = 50;
     renderer.REPEATDELAY = 50;
@@ -64,7 +64,7 @@ void setup() {
     renderer.setAnimation(*breathe);
     delete breathe;  // Clean up our animation after copying its data
     debugln("About to start render task");
-0
+
     // Create the render task
     xTaskCreatePinnedToCore(
         renderTask,         // Function to run

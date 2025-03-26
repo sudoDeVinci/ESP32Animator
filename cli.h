@@ -77,6 +77,8 @@ class MenuSystem {
 
         void displayCurrentMenu();
 
+        String getSerialInput();
+
         /**
          * @brief Processes input for the main menu
          * @param input The character input from serial
@@ -86,6 +88,8 @@ class MenuSystem {
         void processInput(String input);
 
         void processAnimationMenuInput(String input);
+
+        void processBrightnessMenuInput(String input);
 
     public:
         /**

@@ -2,24 +2,36 @@
 #include <Arduino.h>
 
 /**
- * Main update loop for menu system
+ * Blocking function to get a full line of input from the serial monitor
+ * @return String The full line of input from the serial monitor
  */
-void MenuSystem::update() {
+String MenuSystem::getSerialInput() {
     String outstr = "";
-    // Check for user input
-    while (Serial.available() > 0) {
+    bool stringComplete = false;
+
+    while (Serial.available() > 0 || !stringComplete) {
         //small delay to allow input buffer to fill
         vTaskDelay(20);
         char input = Serial.read();
 
         // Consume any extra newlines or carriage returns
         while (Serial.available() && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
-        Serial.read();
+            Serial.read();
         }
 
         outstr += input;
+        if (outstr.length()) stringComplete = true;
     }
 
+    return outstr;
+}
+
+/**
+ * Main update loop for menu system
+ */
+void MenuSystem::update() {
+    String outstr = "";
+    if (Serial.available() > 0) outstr += getSerialInput();
     if (outstr.length() > 0) {
         Serial.println(">> Processing input: " + outstr);
         Serial.println(">> Length: " + String(outstr.length()));
@@ -91,7 +103,8 @@ void MenuSystem::displayMainMenu() {
     Serial.println("3. 50%");
     Serial.println("4. 75%");
     Serial.println("5. 100%");
-    Serial.println("6. Custom value");
+    Serial.println("6. OFF");
+    Serial.println("7. Custom value");
     Serial.println("0. Return to Main Menu");
     Serial.println("\nEnter selection (0-6):");
     xSemaphoreGive(renderer->LOCK);
@@ -239,10 +252,11 @@ void MenuSystem::processInput(String input) {
         case MenuState::ANIMATION_SELECT:
             processAnimationMenuInput(input);
             break;
-        /*
+        
         case MenuState::BRIGHTNESS_SETTINGS:
             processBrightnessMenuInput(input);
             break;
+        /*
         case MenuState::SPEED_SETTINGS:
             processSpeedMenuInput(input);
             break;
@@ -317,27 +331,27 @@ void MenuSystem::processAnimationMenuInput(String input) {
     if (input == "1") {
         newAnimation = createBreatheAnimation(renderer->LEDCOUNT, 0.025, renderer->PEAKBRIGHTNESS, renderer->frequency);
     } else if (input == "2") {
-        newAnimation = createGrowingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+        newAnimation = createGrowingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, 0, 0, renderer->abruptFade);
     } else if (input == "3") {
-        newAnimation = createShrinkingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, 0, 0, true);
+        newAnimation = createShrinkingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, 0, 0, renderer->abruptFade);
     } else if (input == "4") {
-        newAnimation = createExtendingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+        newAnimation = createExtendingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, 0, renderer->abruptFade);
     } else if (input == "5") {
-        newAnimation = createExtinguishingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+        newAnimation = createExtinguishingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, 500, renderer->abruptFade);
     } else if (input == "6") {
         newAnimation = createMovingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
     } else if (input == "7") {
-        newAnimation = createGrowUpAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+        newAnimation = createGrowUpAnimation(renderer->LEDCOUNT, BRIGHTNESS, 0, renderer->abruptFade);
     } else if (input == "8") {
-        newAnimation = createGrowDownAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+        newAnimation = createGrowDownAnimation(renderer->LEDCOUNT, BRIGHTNESS, 0, renderer->abruptFade);
     } else if (input == "9") {
         newAnimation = createHalfFadeAnimation(renderer->LEDCOUNT);
     } else if (input == "10") {
         newAnimation = createPulseAnimation(renderer->LEDCOUNT, 0.015, BRIGHTNESS, 0.15, renderer->frequency);
     } else if (input == "11") {
-        newAnimation = createCirclingBrightDotAnimation(renderer->LEDCOUNT, false, true, 3, 255);
+        newAnimation = createCirclingBrightDotAnimation(renderer->LEDCOUNT, renderer->abruptFade, true, 3, BRIGHTNESS);
     } else if (input == "12") {
-        newAnimation = createCirclingDarkSpotAnimation(renderer->LEDCOUNT, false, true, 3, 100);
+        newAnimation = createCirclingDarkSpotAnimation(renderer->LEDCOUNT, renderer->abruptFade, true, 3, BRIGHTNESS);
     } else {
         validInput = false;
     }
@@ -352,7 +366,58 @@ void MenuSystem::processAnimationMenuInput(String input) {
     }
 }
 
+void MenuSystem::processBrightnessMenuInput(String input) {
+    bool validSelection = true;
+    float bt = 0.0;
+    String inin = "";
+    auto option = input.charAt(0);
 
+
+    switch (option) {
+        case '0':
+            currentState = MenuState::MAIN;
+            return;
+        case '1':
+            renderer->setPeakBrightness(0.1);
+            break;
+        case '2':
+            renderer->setPeakBrightness(0.25);
+            break;
+        case '3':
+            renderer->setPeakBrightness(0.5);
+            break;
+        case '4':
+            renderer->setPeakBrightness(0.75);
+            break;
+        case '5':
+            renderer->setPeakBrightness(1.0);
+            break;
+        case '6':
+            renderer->setPeakBrightness(0.0);
+            break;
+        case '7':
+            Serial.println("\nEnter custom brightness (0.0-1.0):");
+            inin = getSerialInput();
+            bt = inin.toFloat();
+            if (bt >= 0.0 && bt <= 1.0) {
+                renderer->setPeakBrightness(bt);
+            } else {
+                validSelection = false;
+            }
+            break;
+        default:
+            validSelection = false;
+            break;
+    }
+    
+    if (validSelection) {
+      Serial.println("\nBrightness set to: " + String(renderer->PEAKBRIGHTNESS));
+      vTaskDelay(100);
+      currentState = MenuState::MAIN;
+    } else {
+      Serial.println("Invalid brightness option. Please try again.");
+    }
+  }
 
 
 

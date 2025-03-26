@@ -5,184 +5,6 @@
 #include <Adafruit_NeoPixel.h>
 #include "animation.h"
 
-/**
- * @brief Renderer class for managing LED animations
- * @details Contains configuration, state, and the current animation
- * for the LED strip. Provides thread-safe access to animation data.
- */
-struct Renderer {
-    bool RUNNING;                // Flag indicating if animation is currently running
-    bool REPEAT;                 // Flag indicating if animation should repeat
-    uint8_t LEDCOUNT;            // Number of LEDs in the strip
-    uint8_t PIN;                 // GPIO pin connected to the LED strip
-    uint16_t DELAY;              // Delay between animation frames (ms)
-    uint16_t REPEATDELAY;        // Delay between animation repeats (ms)
-    float SPEED;                 // Animation speed multiplier
-    float PEAKBRIGHTNESS;        // Maximum brightness (0.0-1.0)
-    String MODE;                 // Current interactive mode (dynamically allocated)
-    Adafruit_NeoPixel SCREEN;    // NeoPixel LED controller
-    Animation CURRENTANIMATION;  // Currently loaded animation
-    SemaphoreHandle_t LOCK;      // Mutex for thread-safe access
-
-    // Animation button-specific parameters
-    int barPosition;         // For MovingBarAnimation - current bar position
-    int currentExtent;       // For ExtendingBarAnimation, GrowUpAnimation, GrowDownAnimation
-    float topBrightness;     // For HalfFadeAnimation - top half brightness
-    float bottomBrightness;  // For HalfFadeAnimation - bottom half brightness
-    float frequency;           // For Breathe and Pulse - frequency of the animation
-
-    /**
-     * @brief Constructor
-     * @details Initializes the mutex and interactive animation parameters
-     */
-    Renderer() {
-        LOCK = xSemaphoreCreateMutex();
-        barPosition = 0;
-        currentExtent = 0;
-        topBrightness = 1.0;
-        bottomBrightness = 1.0;
-        frequency = 1.0;
-        // Initialize animation directly - don't create a new one and then copy
-        RUNNING = false;
-    }
-
-    /**
-     * @brief Destructor
-     * @details Frees resources
-     */
-    ~Renderer() {
-        if (LOCK != nullptr) {
-            vSemaphoreDelete(LOCK);
-            LOCK = nullptr;
-        }
-        // The Animation destructor will handle its own resources
-    }
-
-    /**
-     * @brief Set the current animation
-     * @param anim The animation to set
-     * @details Copies the animation data to the current animation
-     */
-    void setAnimation(Animation& anim) {
-        // Set the current animation as non-running
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        this->RUNNING = false;
-        xSemaphoreGive(LOCK);
-        
-        // Give the other thread time to stop rendering task
-        vTaskDelay(this->REPEATDELAY);
-
-        // Safely copy the animation data
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        xSemaphoreTake(anim.LOCK, portMAX_DELAY);
-        xSemaphoreTake(CURRENTANIMATION.LOCK, portMAX_DELAY);
-        
-        debugln("Clearing old animation");
-        CURRENTANIMATION.FRAMES->clear();
-        
-        debugln("Copying new animation data");
-        // Deep copy each frame
-        for (const auto& frame : *(anim.FRAMES)) {
-            CURRENTANIMATION.FRAMES->push_back(frame);
-        }
-        
-        CURRENTANIMATION.NAME = anim.NAME;
-        xSemaphoreGive(CURRENTANIMATION.LOCK);
-        xSemaphoreGive(anim.LOCK);
-
-        // Start the animation
-        debugln("Setting new animation as running");
-        this->RUNNING = true;
-        xSemaphoreGive(LOCK);
-
-        debugln(">> New animation " + CURRENTANIMATION.NAME + " set with " + 
-                String(CURRENTANIMATION.FRAMES->size()) + " frames");
-    }
-
-    /**
-     * @brief Checks if an animation is currently running
-     * @return True if running, false otherwise
-     */
-    bool isRunning() const {
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        bool running = RUNNING;
-        xSemaphoreGive(LOCK);
-        return running;
-      }
-    
-    /**
-     * @brief Sets the running flag
-     * @param running The new running flag
-     */
-    void setRunning(bool running) {
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        RUNNING = running;
-        xSemaphoreGive(LOCK);
-    }
-    
-    /**
-     * @brief Clears the screen
-     * @details Clears the LED strip
-     */
-    void clearScreen() {
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        SCREEN.clear();
-        xSemaphoreGive(LOCK);
-    }
-
-    /**
-     * @brief Get the peak brightness
-     */
-    float getPeakBrightness() const {
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        float brightness = PEAKBRIGHTNESS;
-        xSemaphoreGive(LOCK);
-        return brightness;
-    }
-
-    /**
-     * @brief Set Screen pixel value
-     * @param pixel The pixel to set
-     */
-    void setPixelColor(uint8_t pixel, uint8_t r, uint8_t g, uint8_t b) {
-        if (pixel >= LEDCOUNT) return;
-        
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        SCREEN.setPixelColor(pixel, SCREEN.Color(r, g, b));
-        xSemaphoreGive(LOCK);
-    }
-
-    /**
-     * @brief Print configuration values for debugging
-     * @details Outputs LED count, pin, speed, and brightness
-     */
-    void print() const {
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        debugln("LED COUNT: " + String(LEDCOUNT));
-        debugln("PIN: " + String(PIN));
-        debugln("SPEED: " + String(SPEED));
-        debugf("PEAK BRIGHTNESS: %f\n", PEAKBRIGHTNESS);
-        debugln();
-        xSemaphoreGive(LOCK);
-    }
-    
-    // Add this method to the Renderer struct:
-    void initScreen() {
-        xSemaphoreTake(LOCK, portMAX_DELAY);
-        debugln("Initializing NeoPixel screen");
-        // Create a fresh NeoPixel object
-        Adafruit_NeoPixel* SCREENPTR = new Adafruit_NeoPixel(LEDCOUNT, PIN, NEO_GRB + NEO_KHZ800);
-        this->SCREEN = *SCREENPTR;
-        SCREEN.begin();
-        // Clear all pixels and update once
-        for (int i = 0; i < LEDCOUNT; i++) {
-            SCREEN.setPixelColor(i, SCREEN.Color(0, 0, 0));
-        }
-        SCREEN.show();
-        debugln("NeoPixel screen initialized");
-        xSemaphoreGive(LOCK);
-    }
-};
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -330,6 +152,284 @@ Animation* createCirclingDarkSpotAnimation(uint8_t ledCount,
                                            bool clockwise,
                                            uint8_t spotWidth,
                                            uint8_t backgroundBrightness);
+
+
+/**
+ * @brief Renderer class for managing LED animations
+ * @details Contains configuration, state, and the current animation
+ * for the LED strip. Provides thread-safe access to animation data.
+ */
+struct Renderer {
+    bool RUNNING;                // Flag indicating if animation is currently running
+    bool REPEAT;                 // Flag indicating if animation should repeat
+    uint8_t LEDCOUNT;            // Number of LEDs in the strip
+    uint8_t PIN;                 // GPIO pin connected to the LED strip
+    uint16_t DELAY;              // Delay between animation frames (ms)
+    uint16_t REPEATDELAY;        // Delay between animation repeats (ms)
+    float SPEED;                 // Animation speed multiplier
+    float PEAKBRIGHTNESS;        // Maximum brightness (0.0-1.0)
+    String MODE;                 // Current interactive mode (dynamically allocated)
+    Adafruit_NeoPixel SCREEN;    // NeoPixel LED controller
+    Animation CURRENTANIMATION;  // Currently loaded animation
+    SemaphoreHandle_t LOCK;      // Mutex for thread-safe access
+
+    // Animation button-specific parameters
+    int barPosition;         // For MovingBarAnimation - current bar position
+    int currentExtent;       // For ExtendingBarAnimation, GrowUpAnimation, GrowDownAnimation
+    float topBrightness;     // For HalfFadeAnimation - top half brightness
+    float bottomBrightness;  // For HalfFadeAnimation - bottom half brightness
+    float frequency;           // For Breathe and Pulse - frequency of the animation
+    bool abruptFade;
+
+    /**
+     * @brief Constructor
+     * @details Initializes the mutex and interactive animation parameters
+     */
+    Renderer() {
+        LOCK = xSemaphoreCreateMutex();
+        barPosition = 0;
+        currentExtent = 0;
+        topBrightness = 1.0;
+        bottomBrightness = 1.0;
+        frequency = 1.0;
+        abruptFade = false;
+
+        RUNNING = false;
+    }
+
+    /**
+     * @brief Destructor
+     * @details Frees resources
+     */
+    ~Renderer() {
+        if (LOCK != nullptr) {
+            vSemaphoreDelete(LOCK);
+            LOCK = nullptr;
+        }
+        // The Animation destructor will handle its own resources
+    }
+
+    /**
+     * @brief Set the current animation
+     * @param anim The animation to set
+     * @details Copies the animation data to the current animation
+     */
+    void setAnimation(Animation& anim) {
+        // Set the current animation as non-running
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        this->RUNNING = false;
+        xSemaphoreGive(LOCK);
+        
+        // Give the other thread time to stop rendering task
+        vTaskDelay(this->REPEATDELAY);
+
+        // Safely copy the animation data
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        xSemaphoreTake(anim.LOCK, portMAX_DELAY);
+        xSemaphoreTake(CURRENTANIMATION.LOCK, portMAX_DELAY);
+        
+        debugln("Clearing old animation");
+        CURRENTANIMATION.FRAMES->clear();
+        
+        debugln("Copying new animation data");
+        // Deep copy each frame
+        for (const auto& frame : *(anim.FRAMES)) {
+            CURRENTANIMATION.FRAMES->push_back(frame);
+        }
+        
+        CURRENTANIMATION.NAME = anim.NAME;
+        xSemaphoreGive(CURRENTANIMATION.LOCK);
+        xSemaphoreGive(anim.LOCK);
+
+        // Start the animation
+        debugln("Setting new animation as running");
+        this->RUNNING = true;
+        xSemaphoreGive(LOCK);
+
+        debugln(">> New animation " + CURRENTANIMATION.NAME + " set with " + 
+                String(CURRENTANIMATION.FRAMES->size()) + " frames");
+    }
+
+    /**
+     * @brief Checks if an animation is currently running
+     * @return True if running, false otherwise
+     */
+    bool isRunning() const {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        bool running = RUNNING;
+        xSemaphoreGive(LOCK);
+        return running;
+      }
+    
+    /**
+     * @brief Sets the running flag
+     * @param running The new running flag
+     */
+    void setRunning(bool running) {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        RUNNING = running;
+        xSemaphoreGive(LOCK);
+    }
+    
+    /**
+     * @brief Clears the screen
+     * @details Clears the LED strip
+     */
+    void clearScreen() {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        SCREEN.clear();
+        xSemaphoreGive(LOCK);
+    }
+
+    /**
+     * @brief Get the peak brightness
+     */
+    float getPeakBrightness() const {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        float brightness = PEAKBRIGHTNESS;
+        xSemaphoreGive(LOCK);
+        return brightness;
+    }
+
+    void setPeakBrightness(float brightness) { 
+        // Set the current animation as non-running
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        this->RUNNING = false;
+        this->PEAKBRIGHTNESS = brightness;
+        xSemaphoreGive(LOCK);
+        
+        // Give the other thread time to stop rendering task
+        vTaskDelay(this->REPEATDELAY);
+
+        this->regenerateAnimation();
+    }
+
+    /**
+     * @brief Set Screen pixel value
+     * @param pixel The pixel to set
+     */
+    void setPixelColor(uint8_t pixel, uint8_t r, uint8_t g, uint8_t b) {
+        if (pixel >= LEDCOUNT) return;
+        
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        SCREEN.setPixelColor(pixel, SCREEN.Color(r, g, b));
+        xSemaphoreGive(LOCK);
+    }
+
+    /**
+     * @brief Print configuration values for debugging
+     * @details Outputs LED count, pin, speed, and brightness
+     */
+    void print() const {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        debugln("LED COUNT: " + String(LEDCOUNT));
+        debugln("PIN: " + String(PIN));
+        debugln("SPEED: " + String(SPEED));
+        debugf("PEAK BRIGHTNESS: %f\n", PEAKBRIGHTNESS);
+        debugln();
+        xSemaphoreGive(LOCK);
+    }
+    
+    // Add this method to the Renderer struct:
+    void initScreen() {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        debugln("Initializing NeoPixel screen");
+        // Create a fresh NeoPixel object
+        Adafruit_NeoPixel* SCREENPTR = new Adafruit_NeoPixel(LEDCOUNT, PIN, NEO_GRB + NEO_KHZ800);
+        this->SCREEN = *SCREENPTR;
+        SCREEN.begin();
+        // Clear all pixels and update once
+        for (int i = 0; i < LEDCOUNT; i++) {
+            SCREEN.setPixelColor(i, SCREEN.Color(0, 0, 0));
+        }
+        SCREEN.show();
+        debugln("NeoPixel screen initialized");
+        xSemaphoreGive(LOCK);
+    }
+    
+    String getCurrentAnimationName() {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        xSemaphoreTake(CURRENTANIMATION.LOCK, portMAX_DELAY);
+        String name = CURRENTANIMATION.NAME;
+        xSemaphoreGive(CURRENTANIMATION.LOCK);
+        xSemaphoreGive(LOCK);
+        return name;
+    }
+
+    void regenerateAnimation() {
+        String name = this->getCurrentAnimationName();
+        if (name == "NONE") return;
+
+        Animation* animation = nullptr;
+        uint8_t BRIGHTNESS = static_cast<uint8_t>(this->PEAKBRIGHTNESS * 255);
+    
+        debugln("Regenerating animation: " + name);
+        
+        if (name == "Breathe") animation = createBreatheAnimation(this->LEDCOUNT,
+                                                                  0.010,
+                                                                  this->PEAKBRIGHTNESS,
+                                                                  this->frequency);
+        else if (name == "Growing Bar") animation = createGrowingBarAnimation(this->LEDCOUNT,
+                                                                              BRIGHTNESS,
+                                                                              0,
+                                                                              0,
+                                                                              this->abruptFade);
+        else if (name == "Shrinking Bar") animation = createShrinkingBarAnimation(this->LEDCOUNT,
+                                                                                  BRIGHTNESS,
+                                                                                  0,
+                                                                                  0,
+                                                                                  this->abruptFade);
+        else if (name == "Extending Bar") animation = createExtendingBarAnimation(this->LEDCOUNT,
+                                                                                  BRIGHTNESS,
+                                                                                  0,
+                                                                                  this->abruptFade);
+        else if (name == "Extinguishing Bar") animation = createExtinguishingBarAnimation(this->LEDCOUNT,
+                                                                                          BRIGHTNESS,
+                                                                                          500,
+                                                                                          this->abruptFade);
+        else if (name == "Moving Bar") animation = createMovingBarAnimation(this->LEDCOUNT,
+                                                                          BRIGHTNESS,
+                                                                          3);
+        else if (name == "Grow Up") animation = createGrowUpAnimation(this->LEDCOUNT,
+                                                                    BRIGHTNESS,
+                                                                    0,
+                                                                    this->abruptFade);
+        else if (name == "Grow Down") animation = createGrowDownAnimation(this->LEDCOUNT,
+                                                                        BRIGHTNESS,
+                                                                        0,
+                                                                        this->abruptFade);
+        else if (name == "Half Fade") animation = createHalfFadeAnimation(this->LEDCOUNT,
+                                                                          0.10,
+                                                                          this->abruptFade);
+        else if (name == "Pulse") animation = createPulseAnimation(this->LEDCOUNT,
+                                                                   0.010,
+                                                                   this->PEAKBRIGHTNESS,
+                                                                   0.15,
+                                                                   this->frequency);
+        else if (name == "Circling Bright Dot") animation = createCirclingBrightDotAnimation(this->LEDCOUNT,
+                                                                                            this->abruptFade,
+                                                                                            true,
+                                                                                            3,
+                                                                                            BRIGHTNESS);
+        else if (name == "Circling Dark Spot") animation = createCirclingDarkSpotAnimation(this->LEDCOUNT,
+                                                                                           this->abruptFade,
+                                                                                           true,
+                                                                                           3,
+                                                                                           BRIGHTNESS);
+        else {
+            debugln("Invalid animation name: " + name);
+            return;
+        }
+
+        if (animation != nullptr) {
+            this->setAnimation(*animation);
+            delete animation;
+            debugln("Animation regenerated successfully");
+        } else {
+            debugln("Failed to regenerate animation");
+        }
+    }
+};
 
 /**
  * Render the current animation with the given renderer settings.
