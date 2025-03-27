@@ -21,7 +21,8 @@ void renderTask(void* parameters) {
       if (renderer.isRunning()) {
         render(&renderer);
       }
-      vTaskDelay(renderer.REPEATDELAY / renderer.SPEED);
+      //vTaskDelay((renderer.REPEATDELAY / renderer.SPEED) / portTICK_PERIOD_MS);
+      if (renderer.interruptableDelay((unsigned long)(renderer.REPEATDELAY / renderer.SPEED))) renderer.setEarlyExit(false);
     }
 }
 
@@ -41,23 +42,23 @@ void menuTask(void* parameters) {
 void setup() {
     // Initialize serial communication
     Serial.begin(115200);
-    while (!Serial) vTaskDelay(10);
+    while (!Serial) vTaskDelay(100 / portTICK_PERIOD_MS);
 
     // Initialize renderer with default settings
     xSemaphoreTake(renderer.LOCK, portMAX_DELAY);
-    renderer.LEDCOUNT = 20;
+    renderer.LEDCOUNT = 10;
     renderer.PIN = LED_PIN;
     renderer.DELAY = 50;
     renderer.REPEATDELAY = 50;
     renderer.SPEED = 1;
-    renderer.PEAKBRIGHTNESS = 0.5;
+    renderer.PEAKBRIGHTNESS = 0.50f;
     renderer.REPEAT = true;
     renderer.MODE = "NONE";
     renderer.RUNNING = false;
     xSemaphoreGive(renderer.LOCK);
 
     renderer.initScreen();
-    vTaskDelay(200);
+    vTaskDelay(200 / portTICK_PERIOD_MS);
 
     // Start with a breathing animation - use stack-based variable and pass by reference
     Animation* breathe = createCirclingDarkSpotAnimation(renderer.LEDCOUNT, false, true, 3, 100);

@@ -7,7 +7,7 @@
 #include <vector>
 #include <mutex>
 
-#if DEBUG == 0
+#if DEBUG == 1
 /**
  * @brief Print debug information when DEBUG is enabled
  * @param ... Arguments to pass to Serial.print

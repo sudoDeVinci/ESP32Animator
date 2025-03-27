@@ -4,6 +4,7 @@
 
 #include <Adafruit_NeoPixel.h>
 #include "animation.h"
+#include <math.h>
 
 
 /**
@@ -180,6 +181,9 @@ struct Renderer {
     float bottomBrightness;  // For HalfFadeAnimation - bottom half brightness
     float frequency;           // For Breathe and Pulse - frequency of the animation
     bool abruptFade;
+    float minSpeed = 0.005;
+    float maxSpeed = 5.000;
+    bool earlyExit = false;
 
     /**
      * @brief Constructor
@@ -191,7 +195,7 @@ struct Renderer {
         currentExtent = 0;
         topBrightness = 1.0;
         bottomBrightness = 1.0;
-        frequency = 1.0;
+        frequency = 1.5f;
         abruptFade = false;
 
         RUNNING = false;
@@ -221,7 +225,7 @@ struct Renderer {
         xSemaphoreGive(LOCK);
         
         // Give the other thread time to stop rendering task
-        vTaskDelay(this->REPEATDELAY);
+        vTaskDelay(this->REPEATDELAY / portTICK_PERIOD_MS);
 
         // Safely copy the animation data
         xSemaphoreTake(LOCK, portMAX_DELAY);
@@ -291,15 +295,19 @@ struct Renderer {
         return brightness;
     }
 
+    /**
+     * @brief Set the peak brightness
+     * @param brightness The new peak brightness
+     */
     void setPeakBrightness(float brightness) { 
         // Set the current animation as non-running
         xSemaphoreTake(LOCK, portMAX_DELAY);
         this->RUNNING = false;
-        this->PEAKBRIGHTNESS = brightness;
+        this->PEAKBRIGHTNESS = min(1.0f, max(0.0f, brightness));
         xSemaphoreGive(LOCK);
         
         // Give the other thread time to stop rendering task
-        vTaskDelay(this->REPEATDELAY);
+        vTaskDelay(this->REPEATDELAY / portTICK_PERIOD_MS);
 
         this->regenerateAnimation();
     }
@@ -317,6 +325,18 @@ struct Renderer {
     }
 
     /**
+     * @brief Set the LED count
+     * @param count The new LED count
+     */
+    void setSpeed(float speed) {
+        speed = speed + 1e-5; // Avoid division by zero
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        this->SPEED = max(this->minSpeed, min(this->maxSpeed, speed));
+        xSemaphoreGive(LOCK);
+        this->setEarlyExit(true);
+    }
+
+    /**
      * @brief Print configuration values for debugging
      * @details Outputs LED count, pin, speed, and brightness
      */
@@ -330,7 +350,10 @@ struct Renderer {
         xSemaphoreGive(LOCK);
     }
     
-    // Add this method to the Renderer struct:
+    /**
+     * @brief Initialize the NeoPixel screen
+     * @details Creates a new Adafruit_NeoPixel object and clears the screen
+     */
     void initScreen() {
         xSemaphoreTake(LOCK, portMAX_DELAY);
         debugln("Initializing NeoPixel screen");
@@ -347,6 +370,10 @@ struct Renderer {
         xSemaphoreGive(LOCK);
     }
     
+    /**
+     * @brief Get the current animation name
+     * @return The name of the current animation
+     */
     String getCurrentAnimationName() {
         xSemaphoreTake(LOCK, portMAX_DELAY);
         xSemaphoreTake(CURRENTANIMATION.LOCK, portMAX_DELAY);
@@ -356,6 +383,10 @@ struct Renderer {
         return name;
     }
 
+    /**
+     * @brief Regenerate the current animation
+     * @details Re-creates the current animation with the current settings
+     */
     void regenerateAnimation() {
         String name = this->getCurrentAnimationName();
         if (name == "NONE") return;
@@ -402,9 +433,9 @@ struct Renderer {
                                                                           0.10,
                                                                           this->abruptFade);
         else if (name == "Pulse") animation = createPulseAnimation(this->LEDCOUNT,
-                                                                   0.010,
+                                                                   0.010f,
                                                                    this->PEAKBRIGHTNESS,
-                                                                   0.15,
+                                                                   0.15f,
                                                                    this->frequency);
         else if (name == "Circling Bright Dot") animation = createCirclingBrightDotAnimation(this->LEDCOUNT,
                                                                                             this->abruptFade,
@@ -423,11 +454,64 @@ struct Renderer {
 
         if (animation != nullptr) {
             this->setAnimation(*animation);
+            this->setEarlyExit(true);
             delete animation;
             debugln("Animation regenerated successfully");
         } else {
             debugln("Failed to regenerate animation");
         }
+    }
+
+    /**
+     * @brief Set the early exit flag
+     * @param exit The new early exit flag
+     */
+    void setEarlyExit(bool exit) {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        this->earlyExit = exit;
+        xSemaphoreGive(LOCK);
+    }
+
+    /**
+     * @brief Get the early exit flag state
+     * @return The early exit flag state
+     */
+    bool getEarlyExit() {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        bool exit = this->earlyExit;
+        xSemaphoreGive(LOCK);
+        return exit;
+    }
+
+    /**
+     * @brief Performs a delay that can be interrupted
+     * @param milliseconds Total delay time in milliseconds
+     * @param chunkSize Size of each delay chunk in milliseconds (default: 10ms)
+     * @return true if interrupted, false if completed the full delay
+     */
+    bool interruptableDelay(unsigned long milliseconds, unsigned long chunkSize = 10) {
+        // Calculate how many chunks we need
+        unsigned long chunks = milliseconds / chunkSize;
+        unsigned long remainder = milliseconds % chunkSize;
+        bool interrupted = false;
+        
+        // Delay in chunks, checking for early exit between each
+        for (unsigned long i = 0; i < chunks; i++) {
+            interrupted = this->getEarlyExit();
+            if (interrupted) return true;
+            vTaskDelay(chunkSize / portTICK_PERIOD_MS);
+        }
+        
+        // Handle any remaining milliseconds that didn't fit into chunks
+        if (remainder > 0) {
+            interrupted = this->getEarlyExit();
+            if (interrupted) return true;
+            vTaskDelay(remainder / portTICK_PERIOD_MS);
+        }
+        
+        // Check one final time in case it was set during the last delay
+        interrupted = this->getEarlyExit();
+        return interrupted;
     }
 };
 

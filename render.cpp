@@ -6,14 +6,14 @@
  */
 void render(Renderer* rend) {
 
-    debugln(">> Started render task");
+    //debugln(">> Started render task");
 
     xSemaphoreTake(rend->LOCK, portMAX_DELAY);
     
     // Early safety checks
     if (rend == nullptr) return;
     
-    debugln(">> Checking if animation is running");
+    //debugln(">> Checking if animation is running");
     if (!rend->RUNNING) {
         debugln(">> No animation to render or simply not running");
         xSemaphoreGive(rend->LOCK);
@@ -21,7 +21,7 @@ void render(Renderer* rend) {
     }
 
     // Check if the current animation is empty
-    debugln(">> Checking if current animation is empty");
+    //debugln(">> Checking if current animation is empty");
     xSemaphoreTake(rend->CURRENTANIMATION.LOCK, portMAX_DELAY);
     if (rend->CURRENTANIMATION.FRAMES->empty()) {
         debugln(">> Current animation is empty, stopping render");
@@ -31,7 +31,7 @@ void render(Renderer* rend) {
     }
     xSemaphoreGive(rend->CURRENTANIMATION.LOCK);
 
-    debugln(">> Taking stock of settings and animation data");
+    //debugln(">> Taking stock of settings and animation data");
     
     // Create local copies of all settings
     bool isRunning = rend->RUNNING;
@@ -42,13 +42,13 @@ void render(Renderer* rend) {
     uint8_t ledCount = rend->LEDCOUNT;
 
     // Local copies of the current animation data
-    debugln(">> Copying current animation data");
+    //debugln(">> Copying current animation data");
     xSemaphoreTake(rend->CURRENTANIMATION.LOCK, portMAX_DELAY);
     String currentName = rend->CURRENTANIMATION.NAME;
     String previousName  = currentName;    
     // Make a FULL copy of just the current frame data to prevent
     // any possibility of accessing freed memory
-    debugln(">> Copying frame data");
+    //debugln(">> Copying frame data");
     std::vector<std::vector<std::array<uint8_t, 4>>> frames(*(rend ->CURRENTANIMATION.FRAMES));
     std::vector<std::array<uint8_t, 4>> frame = frames[0];
     size_t frameCount = frames.size();
@@ -56,12 +56,12 @@ void render(Renderer* rend) {
     xSemaphoreGive(rend->CURRENTANIMATION.LOCK);
     xSemaphoreGive(rend->LOCK);
 
-    debugln(">> Starting render loop");
+    //debugln(">> Starting render loop");
 
     // Loop through all frames
     for (size_t frameIdx = 0; frameIdx < frameCount && isRunning; frameIdx++) {
         // Get the current frame settings
-        debugln(">> Getting current frame settings");
+        //debugln(">> Getting current frame settings");
         xSemaphoreTake(rend->LOCK, portMAX_DELAY);
         isRunning = rend->RUNNING;
         repeat = rend->REPEAT;
@@ -74,21 +74,21 @@ void render(Renderer* rend) {
 
         // Check if the animation has changed
         if (currentName != previousName) {
-            debugln(">> Animation changed, stopping render");
+            //debugln(">> Animation changed, stopping render");
             break;
         }
 
         // Check if the animation has stopped
         if (!isRunning) {
-            debugln(">> Animation stopped, stopping render");
+            //debugln(">> Animation stopped, stopping render");
             break;
         }
 
         // Clear the screen
-        debugln(">> Clearing screen");
+        //debugln(">> Clearing screen");
         rend -> clearScreen();
 
-        debugln(">> Rendering frame " + String(frameIdx) + " of " + String(frameCount));
+        //debugln(">> Rendering frame " + String(frameIdx) + " of " + String(frameCount));
         frame = frames[frameIdx];
         frameSize = frame.size();
 
@@ -103,19 +103,22 @@ void render(Renderer* rend) {
                 static_cast<uint8_t>(pixel[3])
             );
         }
-        
-        
+
         xSemaphoreTake(rend->LOCK, portMAX_DELAY);
-        debugln(">> Showing screen");
+        //debugln(">> Showing screen");
         rend->SCREEN.show();
         xSemaphoreGive(rend->LOCK);
 
         previousName = currentName;
 
-        debugln(">> Delaying for " + String(delay / speed) + "ms");
+        //debugln(">> Delaying for " + String(delay / speed) + "ms");
         // Delay for the frame duration
-        vTaskDelay(delay / speed);
-
+        //vTaskDelay((delay / speed) / portTICK_PERIOD_MS);
+        if (rend->interruptableDelay((unsigned long)(delay / speed))) {
+            debugln(">> Render interrupted, stopping");
+            rend->setEarlyExit(false);
+            break;
+        };
     }
 
     // Repeat the animation if necessary
@@ -161,8 +164,7 @@ Animation* createBreatheAnimation(uint8_t ledCount,
         // Create a new frame vector for this frame
         std::vector<std::array<uint8_t, 4>> frame;
         frame.reserve(ledCount);  // Reserve space for all LEDs
-        
-        debugln("Creating pixel data for frame " + String(i));
+
         for (int led = 0; led < ledCount; led++) {
             std::array<uint8_t, 4> pixel = {
                 static_cast<uint8_t>(led),
@@ -242,13 +244,9 @@ Animation* createGrowingBarAnimation(uint8_t ledCount,
                     static_cast<uint8_t>(brightness),
                     static_cast<uint8_t>(brightness)
                 };
-
-                debugln(">> Adding pixel to frame");
                 frame.push_back(pixel);
             }
         }
-
-        debugln(">> Adding frame to frames");
         frames->push_back(frame);
     }
 
@@ -320,12 +318,9 @@ Animation* createShrinkingBarAnimation(uint8_t ledCount,
                     static_cast<uint8_t>(brightness),
                     static_cast<uint8_t>(brightness)
                 };
-
-                debugln(">> Adding pixel to frame");
                 frame.push_back(pixel);
             }
         }
-        debugln(">> Adding frame to frames");
         frames->push_back(frame);
     }
     xSemaphoreGive(animation->LOCK);
@@ -390,12 +385,9 @@ Animation* createExtendingBarAnimation(uint8_t ledCount,
                     static_cast<uint8_t>(brightness),
                     static_cast<uint8_t>(brightness)
                 };
-                debugln(">> Adding pixel to frame");
                 frame.push_back(pixel);
             }
         }
-        
-        debugln(">> Adding frame to frames");
         frames->push_back(frame);
     }
     
@@ -473,11 +465,9 @@ Animation* createExtinguishingBarAnimation(uint8_t ledCount,
                     static_cast<uint8_t>(brightness),
                     static_cast<uint8_t>(brightness)
                 };
-                debugln(">> Adding pixel to frame");
                 frame.push_back(pixel);
             }
         }
-        debugln("Adding frame to frames");
         frames -> push_back(frame);
     }
 
@@ -711,9 +701,9 @@ Animation* createPulseAnimation(uint8_t ledCount,
     Animation* animation = new Animation("Pulse");
     std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
     
-    // Use frequency to adjust frame count - higher frequency = fewer frames
-    // Base frame count is 30 at frequency 1.0
-    const int frameCount = max(10, int(30 / frequency));
+    // Reduce frame count for clearer pulse effect
+    // The wild flashing was likely due to too many frames with small differences
+    const int frameCount = max(10, int(60 / frequency));
     
     debugln("Creating pulse animation with " + String(frameCount) + " frames (frequency: " + String(frequency) + ")");
     
@@ -726,23 +716,25 @@ Animation* createPulseAnimation(uint8_t ledCount,
     
     debugln("Attack frames: " + String(attackFrames) + ", Decay frames: " + String(decayFrames));
     
+    
+    // Create the main pulse frames
     for (int i = 0; i < frameCount; i++) {
         float brightness;
         
         // Fast attack phase
         if (i < attackFrames) {
-            // Use a slightly accelerating curve for more dramatic attack
+            // More dramatic exponential rise instead of quadratic
             float progress = float(i) / float(attackFrames);
-            // Quadratic curve for acceleration effect
+            // Faster rise with cubic curve
             brightness = minBrightness + (maxBrightness - minBrightness) * 
-                         (progress * progress);
+                         (progress * progress * progress);
         } 
         // Slow decay phase
         else {
             // Exponential decay curve for more natural falloff
             float decayProgress = float(i - attackFrames) / float(decayFrames);
-            // Adjust decay rate for more dramatic effect
-            float decayRate = 4.0 * frequency; // Higher frequency = faster decay
+            // Adjust decay rate - slower decay for more noticeable effect
+            float decayRate =  2.5 * frequency; // Higher frequency = faster decay
             brightness = maxBrightness - (maxBrightness - minBrightness) * 
                          (1.0 - exp(-decayRate * decayProgress));
         }
@@ -770,7 +762,7 @@ Animation* createPulseAnimation(uint8_t ledCount,
     }
     
     xSemaphoreGive(animation->LOCK);
-    debugln("Pulse animation created with " + String(frameCount) + " frames");
+    debugln("Pulse animation created with " + String(frameCount + 2) + " frames");
     return animation;
 }
 

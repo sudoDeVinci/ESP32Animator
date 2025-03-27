@@ -8,19 +8,25 @@
 String MenuSystem::getSerialInput() {
     String outstr = "";
     bool stringComplete = false;
+    int inputint = -1;
+    char input;
 
     while (Serial.available() > 0 || !stringComplete) {
-        //small delay to allow input buffer to fill
-        vTaskDelay(20);
-        char input = Serial.read();
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+        inputint = Serial.read();
 
         // Consume any extra newlines or carriage returns
         while (Serial.available() && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
             Serial.read();
         }
 
+        if (inputint == -1) continue;
+
+        input = (char)inputint;
         outstr += input;
         if (outstr.length()) stringComplete = true;
+
+        Serial.println(">> Input: " + outstr);
     }
 
     return outstr;
@@ -241,9 +247,7 @@ void MenuSystem::displayCurrentMenu() {
  * --------------- MENU SELECTION METHODS ---------------- *
  ***********************************************************/
 
-/**
- * Process user input based on current menu state
- */
+
 void MenuSystem::processInput(String input) {
     switch (this->currentState) {
         case MenuState::MAIN:
@@ -256,10 +260,12 @@ void MenuSystem::processInput(String input) {
         case MenuState::BRIGHTNESS_SETTINGS:
             processBrightnessMenuInput(input);
             break;
-        /*
+
         case MenuState::SPEED_SETTINGS:
             processSpeedMenuInput(input);
             break;
+
+        /*
         case MenuState::LED_COUNT_SETTINGS:
             processLEDCountMenuInput(input);
             break;
@@ -347,7 +353,7 @@ void MenuSystem::processAnimationMenuInput(String input) {
     } else if (input == "9") {
         newAnimation = createHalfFadeAnimation(renderer->LEDCOUNT);
     } else if (input == "10") {
-        newAnimation = createPulseAnimation(renderer->LEDCOUNT, 0.015, BRIGHTNESS, 0.15, renderer->frequency);
+        newAnimation = createPulseAnimation(renderer->LEDCOUNT, 0.015, renderer->PEAKBRIGHTNESS, 0.15, renderer->frequency);
     } else if (input == "11") {
         newAnimation = createCirclingBrightDotAnimation(renderer->LEDCOUNT, renderer->abruptFade, true, 3, BRIGHTNESS);
     } else if (input == "12") {
@@ -359,7 +365,7 @@ void MenuSystem::processAnimationMenuInput(String input) {
 
     if (validInput) {
         renderer->setAnimation(*newAnimation);
-        vTaskDelay(100);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
         delete newAnimation;
     } else {
         Serial.println("Invalid option. Please try again.");
@@ -419,7 +425,54 @@ void MenuSystem::processBrightnessMenuInput(String input) {
     }
   }
 
+void MenuSystem::processSpeedMenuInput(String input) {
+    bool validSelection = true;
+    char option = input.charAt(0);
+    String inin = "";
+    float speed = 0.0;
 
+    switch (option) {
+        case '0':
+            currentState = MenuState::MAIN;
+            return;
+        case '1':
+            renderer->setSpeed(0.25);
+            break;
+        case '2':
+            renderer->setSpeed(0.5);
+            break;
+        case '3':
+            renderer->setSpeed(1.0);
+            break;
+        case '4':
+            renderer->setSpeed(1.5);
+            break;
+        case '5':
+            renderer->setSpeed(2.0);
+            break;
+        case '6':
+            Serial.println("\nEnter custom speed (0.0-5.0):");
+            inin = getSerialInput();
+            speed = inin.toFloat();
+            if (speed >= 0.0000 && speed <= 10.000000) {
+                renderer->setSpeed(speed);
+            } else {
+                validSelection = false;
+            }
+            break;
+        default:
+            validSelection = false;
+            break;
+    }
+    
+    if (validSelection) {
+      Serial.println("\nSpeed set to: " + String(renderer->SPEED) + "x");
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+      this->currentState = MenuState::MAIN;
+    } else {
+      Serial.println("Invalid speed option. Please try again.");
+    }
+  }
 
 
 
