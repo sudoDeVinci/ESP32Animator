@@ -184,6 +184,7 @@ struct Renderer {
     float minSpeed = 0.005;
     float maxSpeed = 5.000;
     bool earlyExit = false;
+    uint8_t maxLEDCount = 50;
 
     /**
      * @brief Constructor
@@ -313,6 +314,25 @@ struct Renderer {
     }
 
     /**
+     * @brief Set the LED count
+     * @param count The new LED count
+     */
+    void setLEDCount(uint8_t count) {
+        // Set the current animation as non-running
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        this->RUNNING = false;
+        this->LEDCOUNT = count;
+        xSemaphoreGive(LOCK);
+
+        // Give the other thread time to stop rendering task
+        vTaskDelay(this->REPEATDELAY / portTICK_PERIOD_MS);
+
+        // Reinitialize the screen and animation
+        // this->initScreen();
+        this->regenerateAnimation();
+    }
+
+    /**
      * @brief Set Screen pixel value
      * @param pixel The pixel to set
      */
@@ -358,7 +378,7 @@ struct Renderer {
         xSemaphoreTake(LOCK, portMAX_DELAY);
         debugln("Initializing NeoPixel screen");
         // Create a fresh NeoPixel object
-        Adafruit_NeoPixel* SCREENPTR = new Adafruit_NeoPixel(LEDCOUNT, PIN, NEO_GRB + NEO_KHZ800);
+        Adafruit_NeoPixel* SCREENPTR = new Adafruit_NeoPixel(this->maxLEDCount, PIN, NEO_GRB + NEO_KHZ800);
         this->SCREEN = *SCREENPTR;
         SCREEN.begin();
         // Clear all pixels and update once
@@ -483,7 +503,16 @@ struct Renderer {
         return exit;
     }
 
+    uint8_t getMaxLEDCount() {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        uint8_t count = this->maxLEDCount;
+        xSemaphoreGive(LOCK);
+        return count;
+    }
+
     /**
+     * NOTE: This isn't `TECHNICALLY` thread-safe, and should only be called from the main/render threads.
+     *       It's mostly safe however since no data is changed between loops, and all method calls are thread-safe.
      * @brief Performs a delay that can be interrupted
      * @param milliseconds Total delay time in milliseconds
      * @param chunkSize Size of each delay chunk in milliseconds (default: 10ms)
@@ -501,7 +530,7 @@ struct Renderer {
             if (interrupted) return true;
             vTaskDelay(chunkSize / portTICK_PERIOD_MS);
         }
-        
+
         // Handle any remaining milliseconds that didn't fit into chunks
         if (remainder > 0) {
             interrupted = this->getEarlyExit();

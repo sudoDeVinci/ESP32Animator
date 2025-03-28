@@ -56,7 +56,6 @@ void setup() {
     renderer.MODE = "NONE";
     renderer.RUNNING = false;
     xSemaphoreGive(renderer.LOCK);
-
     renderer.initScreen();
     vTaskDelay(200 / portTICK_PERIOD_MS);
 
@@ -94,5 +93,5 @@ void setup() {
  */
 void loop() {
     // Main loop is empty since we're using FreeRTOS tasks
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    vTaskDelay(100000 / portTICK_PERIOD_MS);
 }
