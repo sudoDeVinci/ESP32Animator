@@ -94,6 +94,8 @@ class MenuSystem {
         void processSpeedMenuInput(String input);
 
         void processLEDCountMenuInput(String input);
+
+        void processRepeatMenuInput(String input);
     public:
         /**
          * @brief Set the current menu state to MAIN and trigger a redraw.

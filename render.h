@@ -345,6 +345,28 @@ struct Renderer {
     }
 
     /**
+     * @brief Set the repeat flag
+     * @param repeat The new repeat flag
+     */
+    void setRepeat(bool repeat) {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        this->REPEAT = repeat;
+        xSemaphoreGive(LOCK);
+        if (repeat) this->setRunning(repeat);
+    }
+
+    /**
+     * @brief Get the repeat flag
+     * @return The repeat flag state
+     */
+    bool getRepeat() {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        bool repeat = this->REPEAT;
+        xSemaphoreGive(LOCK);
+        return repeat;
+    }
+
+    /**
      * @brief Set the LED count
      * @param count The new LED count
      */

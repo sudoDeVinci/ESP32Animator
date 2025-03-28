@@ -286,10 +286,11 @@ void MenuSystem::processInput(String input)
     case MenuState::LED_COUNT_SETTINGS:
         processLEDCountMenuInput(input);
         break;
-    /*
+    
     case MenuState::REPEAT_SETTINGS:
         processRepeatMenuInput(input);
         break;
+    /*
     case MenuState::MODE_SETTINGS:
         processModeMenuInput(input);
         break;
@@ -536,7 +537,6 @@ void MenuSystem::processSpeedMenuInput(String input)
     }
 }
 
-
 void MenuSystem::processLEDCountMenuInput(String input)
 {
     bool validSelection = true;
@@ -586,3 +586,45 @@ void MenuSystem::processLEDCountMenuInput(String input)
         Serial.println("Invalid LED count option. Please try again.");
     }
 }
+
+void MenuSystem::processRepeatMenuInput(String input)
+{
+    bool validSelection = true;
+    char option = input.charAt(0);
+
+    switch (option)
+    {
+        case '0':
+            currentState = MenuState::MAIN;
+            return;
+        case '1':
+            renderer->setRepeat(true);
+            break;
+        case '2':
+            renderer->setRepeat(false);
+            break;
+        default:
+            validSelection = false;
+            break;
+    }
+
+    if (validSelection)
+    {
+        Serial.println("\nRepeat: " + String(renderer->REPEAT ? "ON" : "OFF"));
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+    else
+    {
+        Serial.println("Invalid repeat option. Please try again.");
+    }
+}
+
+
+
+
+
+
+
+
+
+

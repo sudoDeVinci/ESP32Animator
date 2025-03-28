@@ -18,11 +18,9 @@ TaskHandle_t cliTaskHandle = NULL;
  */
 void renderTask(void* parameters) {
     while (true) {
-      if (renderer.isRunning()) {
-        render(&renderer);
-      }
-      //vTaskDelay((renderer.REPEATDELAY / renderer.SPEED) / portTICK_PERIOD_MS);
+      if (renderer.isRunning()) render(&renderer);
       if (renderer.interruptableDelay((unsigned long)(renderer.REPEATDELAY / renderer.SPEED))) renderer.setEarlyExit(false);
+      // if (renderer.getRepeat()) renderer.setRunning(true);
     }
 }
 
@@ -51,7 +49,7 @@ void setup() {
     renderer.DELAY = 50;
     renderer.REPEATDELAY = 50;
     renderer.SPEED = 1;
-    renderer.PEAKBRIGHTNESS = 0.50f;
+    renderer.PEAKBRIGHTNESS = 0.40f;
     renderer.REPEAT = true;
     renderer.MODE = "NONE";
     renderer.RUNNING = false;
