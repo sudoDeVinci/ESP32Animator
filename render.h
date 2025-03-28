@@ -16,7 +16,10 @@
  * @return The new animation
  * @details A smooth, sinusoidal increase and decrease in brightness, mimicking breathing.
  */
-Animation* createBreatheAnimation(uint8_t ledCount, float minBrightness = 0.025, float maxBrightness = 1.0, float frequency = 1);
+Animation* createBreatheAnimation(uint8_t ledCount,
+                                  float minBrightness = 0.025f,
+                                  float maxBrightness = 1.0,
+                                  float frequency = 1);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -28,7 +31,11 @@ Animation* createBreatheAnimation(uint8_t ledCount, float minBrightness = 0.025,
  * @return The new animation
  * @details A bright bar starts at X% of the height on each side and each “up” button press causes bar to grow towards the top, and each “down” button press causes bar to shrink.
  */
-Animation* createGrowingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint8_t startHeight = 0, uint8_t endHeight = 0, bool abruptFade = false);
+Animation* createGrowingBarAnimation(uint8_t ledCount,
+                                     uint8_t maxBrightness,
+                                     uint8_t startHeight = 0,
+                                     uint8_t endHeight = 0,
+                                     bool abruptFade = false);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -41,7 +48,11 @@ Animation* createGrowingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, ui
  * @return Animation object with shrinking bar effect
  * @details A bright bar shrinks from full height to the center
  */
-Animation* createShrinkingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint8_t startHeight = 0, uint8_t endHeight = 0, bool abruptFade = true);
+Animation* createShrinkingBarAnimation(uint8_t ledCount,
+                                       uint8_t maxBrightness,
+                                       uint8_t startHeight = 0,
+                                       uint8_t endHeight = 0,
+                                       bool abruptFade = true);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -53,7 +64,10 @@ Animation* createShrinkingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, 
  * @return Animation object with extending bar effect
  * @details A bright line starts at the middle and extends symmetrically
  */
-Animation* createExtendingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint8_t endDistance = 0, bool abruptFade = false);
+Animation* createExtendingBarAnimation(uint8_t ledCount,
+                                       uint8_t maxBrightness,
+                                       uint8_t endDistance = 0,
+                                       bool abruptFade = false);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -64,7 +78,10 @@ Animation* createExtendingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, 
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
  * @return Animation object with extinguishing bar effect
  */
-Animation* createExtinguishingBarAnimation(uint8_t ledCount, uint8_t maxBrightness, uint16_t retentionTime = 500, bool abruptFade = false);
+Animation* createExtinguishingBarAnimation(uint8_t ledCount,
+                                           uint8_t maxBrightness,
+                                           uint16_t retentionTime = 500,
+                                           bool abruptFade = false);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -74,7 +91,9 @@ Animation* createExtinguishingBarAnimation(uint8_t ledCount, uint8_t maxBrightne
  * @param barSize Size of the bar
  * @return Animation object with moving bar effect
  */
-Animation* createMovingBarAnimation(uint8_t ledCount, uint8_t brightness, uint8_t barSize = 5);
+Animation* createMovingBarAnimation(uint8_t ledCount,
+                                    uint8_t brightness,
+                                    uint8_t barSize = 5);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -85,7 +104,10 @@ Animation* createMovingBarAnimation(uint8_t ledCount, uint8_t brightness, uint8_
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
  * @return Animation object with growing bar effect
  */
-Animation* createGrowUpAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance = 0, bool abruptFade = true);
+Animation* createGrowUpAnimation(uint8_t ledCount,
+                                 uint8_t brightness,
+                                 uint8_t endDistance = 0,
+                                 bool abruptFade = true);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -96,7 +118,10 @@ Animation* createGrowUpAnimation(uint8_t ledCount, uint8_t brightness, uint8_t e
  * @param abruptFade If true, bar has sharp edges; if false, edges fade
  * @return Animation object with growing bar effect
  */
-Animation* createGrowDownAnimation(uint8_t ledCount, uint8_t brightness, uint8_t endDistance = 0, bool abruptFade = true);
+Animation* createGrowDownAnimation(uint8_t ledCount,
+                                   uint8_t brightness,
+                                   uint8_t endDistance = 0,
+                                   bool abruptFade = true);
 
 /**
  * @brief Starts with all LEDs on, and top half dims when “up” button pressed and bottom half dims when “down” button pressed
@@ -106,7 +131,9 @@ Animation* createGrowDownAnimation(uint8_t ledCount, uint8_t brightness, uint8_t
  * @param gradientFade If true, the fade is gradual; if false, it is abrupt
  * @return Animation object with first frame of half fade effect
  */
-Animation* createHalfFadeAnimation(uint8_t ledCount, float dimLevel = 0.2, bool gradientFade = false);
+Animation* createHalfFadeAnimation(uint8_t ledCount,
+                                   float dimLevel = 0.2,
+                                   bool gradientFade = false);
 
 /**
  * Create a new pulse animation with quick rise and slow decay
@@ -118,9 +145,9 @@ Animation* createHalfFadeAnimation(uint8_t ledCount, float dimLevel = 0.2, bool 
  * @return Animation* Pointer to the created animation
  */
 Animation* createPulseAnimation(uint8_t ledCount, 
-                                float minBrightness = 0.015, 
-                                float maxBrightness = 0.30,
-                                float attackProportion = 0.15,
+                                float minBrightness = 0.015f, 
+                                float maxBrightness = 0.30f,
+                                float attackProportion = 0.15f,
                                 float frequency = 1.5);
 
 
@@ -198,7 +225,7 @@ struct Renderer {
         bottomBrightness = 1.0;
         frequency = 1.5f;
         abruptFade = false;
-
+        MODE = "NONE";
         RUNNING = false;
     }
 
@@ -525,11 +552,28 @@ struct Renderer {
         return exit;
     }
 
+    /**
+     * @brief Set the maximum LED count
+     * @param count The new maximum LED count
+     */
     uint8_t getMaxLEDCount() {
         xSemaphoreTake(LOCK, portMAX_DELAY);
         uint8_t count = this->maxLEDCount;
         xSemaphoreGive(LOCK);
         return count;
+    }
+
+    void setInteractiveMode(String mode) {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        this->MODE = mode;
+        xSemaphoreGive(LOCK);
+    }
+
+    String getInteractiveMode() {
+        xSemaphoreTake(LOCK, portMAX_DELAY);
+        String mode = this->MODE;
+        xSemaphoreGive(LOCK);
+        return mode;
     }
 
     /**

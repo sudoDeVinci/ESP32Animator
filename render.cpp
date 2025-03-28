@@ -660,7 +660,9 @@ Animation* createGrowDownAnimation(uint8_t ledCount,
  * @param gradientFade If true, the fade is gradual; if false, it is abrupt
  * @return Animation object with first frame of half fade effect
  */
-Animation* createHalfFadeAnimation(uint8_t ledCount, float dimLevel, bool gradientFade) {
+Animation* createHalfFadeAnimation(uint8_t ledCount,
+                                   float dimLevel,
+                                   bool gradientFade) {
     Animation* animation = new Animation("Half Fade");
     xSemaphoreTake(animation->LOCK, portMAX_DELAY);
     std::vector<std::vector<std::array<uint8_t, 4>>>* frames = animation->FRAMES;
@@ -855,7 +857,6 @@ Animation* createCirclingBrightDotAnimation(uint8_t ledCount,
 }
 
 
-
 /**
  * Create an animation where a dark spot circles around a fully lit LED strip
  * @param ledCount The number of LEDs in the strip
@@ -947,9 +948,6 @@ Animation* createCirclingDarkSpotAnimation(uint8_t ledCount,
     debugln("Circling Dark Spot animation created with " + String(frameCount) + " frames");
     return animation;
 }
-
-
-
 
 
 

@@ -619,7 +619,51 @@ void MenuSystem::processRepeatMenuInput(String input)
     }
 }
 
+void MenuSystem::processModeMenuInput(String input)
+{
+    bool validSelection = true;
+    char option = input.charAt(0);
+    String inin = "";
+    uint8_t mode = 0;
 
+    switch (option)
+    {
+        case '0':
+            currentState = MenuState::MAIN;
+            return;
+        case '1':
+            renderer->setInteractiveMode("MOVING BAR");
+            break;
+        case '2':
+            renderer->setInteractiveMode("GROWING BAR");
+            break;
+        case '3':
+            renderer->setInteractiveMode("EXTENDING BAR");
+            break;
+        case '4':
+            renderer->setInteractiveMode("HALF FADE");
+            break;
+        case '5':
+            renderer->setInteractiveMode("GROW UP");
+            break;
+        case '6':
+            renderer->setInteractiveMode("GROW DOWN");
+            break;
+        case '7':
+            renderer->setInteractiveMode("NONE");
+            break;
+        default:
+            validSelection = false;
+            break;
+    }
+
+    if (validSelection)
+    {
+        Serial.println("\nInteractive mode set to: " + String(renderer->MODE));
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+    else Serial.println("Invalid interactive mode option. Please try again.");
+}
 
 
 
