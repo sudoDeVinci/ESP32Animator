@@ -356,6 +356,7 @@ void MenuSystem::processAnimationMenuInput(String input)
 
     Animation *newAnimation = nullptr;
     bool validInput = true;
+    uint8_t barSize = 3;
     xSemaphoreTake(renderer->LOCK, portMAX_DELAY);
 
     uint8_t BRIGHTNESS = static_cast<uint8_t>(renderer->PEAKBRIGHTNESS * 255);
@@ -378,11 +379,12 @@ void MenuSystem::processAnimationMenuInput(String input)
     }
     else if (input == "5")
     {
-        newAnimation = createExtinguishingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, 500, renderer->abruptFade);
+        newAnimation = createExtinguishingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, renderer->DELAY*5, renderer->abruptFade);
     }
     else if (input == "6")
     {
-        newAnimation = createMovingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS);
+        newAnimation = createMovingBarAnimation(renderer->LEDCOUNT, BRIGHTNESS, barSize);
+        renderer->initMovingBarAnimation(barSize);
     }
     else if (input == "7")
     {
@@ -664,11 +666,5 @@ void MenuSystem::processModeMenuInput(String input)
     }
     else Serial.println("Invalid interactive mode option. Please try again.");
 }
-
-
-
-
-
-
 
 

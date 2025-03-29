@@ -58,7 +58,8 @@ void setup() {
     vTaskDelay(200 / portTICK_PERIOD_MS);
 
     // Start with a breathing animation - use stack-based variable and pass by reference
-    Animation* breathe = createCirclingDarkSpotAnimation(renderer.LEDCOUNT, false, true, 3, 100);
+    uint8_t BRIGHTNESS = static_cast<uint8_t>(renderer.PEAKBRIGHTNESS * 255);
+    Animation* breathe = createShrinkingBarAnimation(renderer.LEDCOUNT, BRIGHTNESS, 0, 0, false, false);
     renderer.setAnimation(*breathe);
     delete breathe;  // Clean up our animation after copying its data
     debugln("About to start render task");

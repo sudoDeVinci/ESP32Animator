@@ -28,6 +28,7 @@ Animation* createBreatheAnimation(uint8_t ledCount,
  * @param startHeight The starting height of the bar
  * @param endHeight The ending height of the bar
  * @param abruptFade If true, the bar will abruptly fade in and out
+ * @param interactive If True, Animation is interactive and requires button input
  * @return The new animation
  * @details A bright bar starts at X% of the height on each side and each “up” button press causes bar to grow towards the top, and each “down” button press causes bar to shrink.
  */
@@ -35,7 +36,8 @@ Animation* createGrowingBarAnimation(uint8_t ledCount,
                                      uint8_t maxBrightness,
                                      uint8_t startHeight = 0,
                                      uint8_t endHeight = 0,
-                                     bool abruptFade = false);
+                                     bool abruptFade = false,
+                                     bool interactive = false);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -52,7 +54,8 @@ Animation* createShrinkingBarAnimation(uint8_t ledCount,
                                        uint8_t maxBrightness,
                                        uint8_t startHeight = 0,
                                        uint8_t endHeight = 0,
-                                       bool abruptFade = true);
+                                       bool abruptFade = true,
+                                       bool interactive = false);
 
 /**
  * WARNING: Animation is dynamically allocated and must be freed.
@@ -202,7 +205,8 @@ struct Renderer {
     SemaphoreHandle_t LOCK;      // Mutex for thread-safe access
 
     // Animation button-specific parameters
-    int barPosition;         // For MovingBarAnimation - current bar position
+    uint8_t barStart = 0;         // For MovingBarAnimation - current bar position
+    uint8_t barEnd = 0;           // For MovingBarAnimation - current bar end position
     int currentExtent;       // For ExtendingBarAnimation, GrowUpAnimation, GrowDownAnimation
     float topBrightness;     // For HalfFadeAnimation - top half brightness
     float bottomBrightness;  // For HalfFadeAnimation - bottom half brightness
@@ -219,7 +223,6 @@ struct Renderer {
      */
     Renderer() {
         LOCK = xSemaphoreCreateMutex();
-        barPosition = 0;
         currentExtent = 0;
         topBrightness = 1.0;
         bottomBrightness = 1.0;
@@ -567,6 +570,7 @@ struct Renderer {
         xSemaphoreTake(LOCK, portMAX_DELAY);
         this->MODE = mode;
         xSemaphoreGive(LOCK);
+        if (mode != "NONE") this->setRepeat(false);
     }
 
     String getInteractiveMode() {
@@ -574,6 +578,14 @@ struct Renderer {
         String mode = this->MODE;
         xSemaphoreGive(LOCK);
         return mode;
+    }
+
+    void initMovingBarAnimation(uint8_t barSize) {
+        debugln("Initializing moving bar animation with size: " + String(barSize));
+        if (barSize == 0) barSize = 1;
+        int middleLed = this->LEDCOUNT / 2;
+        this->barStart = middleLed - barSize / 2;
+        this->barEnd = middleLed - barSize / 2 + barSize - 1;
     }
 
     /**
@@ -608,6 +620,8 @@ struct Renderer {
         interrupted = this->getEarlyExit();
         return interrupted;
     }
+
+    void updateMovingBarAnimation(bool upPressed, bool downPressed);
 };
 
 /**
