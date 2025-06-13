@@ -106,9 +106,6 @@ struct Animation {
             delete FRAMES;
             FRAMES = nullptr;
         }
-        
-        // Don't delete NAME - it's not a pointer
-        // Remove: if (NAME != nullptr) { delete &NAME; }
     }
 
     String getName() {
