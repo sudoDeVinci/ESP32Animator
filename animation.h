@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <vector>
 #include <mutex>
+#include <memory>
 
 #if DEBUG == 1
 /**
@@ -31,39 +32,23 @@
 #define debugf(...)
 #endif
 
+// Type aliases for code clarity and maintainability
+using Pixel = std::array<uint8_t, 4>;
+using Frame = std::vector<Pixel>;
+using FrameBuffer = std::vector<Frame>;
+
 struct Animation {
-    std::vector<std::vector<std::array<uint8_t, 4>>>* FRAMES; // Animation frames
-    String NAME; // Animation name (dynamically allocated)
-    SemaphoreHandle_t LOCK;      // Mutex for thread-safe access
+private:
+    String name_;
+    std::unique_ptr<FrameBuffer> frames_;
+    mutable std::mutex mutex_;
 
-    /**
-     * @brief Default constructor
-     * @details Initializes name to nullptr
-     */
-    Animation() : NAME("NONE") {
-        LOCK = xSemaphoreCreateMutex();
-        FRAMES = new std::vector<std::vector<std::array<uint8_t, 4>>>;
-    }
-
-    /**
-     * @brief Constructor with name
-     * @param name The name of the animation
-     * @details Initializes the name field with the provided value
-     */
-    Animation(String namestr) : NAME(namestr) {
-        LOCK = xSemaphoreCreateMutex();
-        FRAMES = new std::vector<std::vector<std::array<uint8_t, 4>>>;
-    }
+public:
+    Animation() : name("NONE") {}
   
-    /**
-     * @brief Copy constructor
-     * @param other The animation to copy
-     * @details Copies the name and frames from the other animation
-     */
-    Animation(const Animation &other) {
-        NAME = other.NAME;
-        FRAMES = other.FRAMES;
-        LOCK = xSemaphoreCreateMutex();
+    explicit Animation(const String& namestr) 
+        : name_(namestr), frames_(std::make_unique<FrameBuffer>()) {
+        debugf("Animation '%s' created\n", namestr.c_str());
     }
 
     /**
@@ -72,10 +57,11 @@ struct Animation {
      * @details Moves the name and frames from the other animation
      */
     Animation(Animation &&other) {
-        NAME = std::move(other.NAME);
-        FRAMES = std::move(other.FRAMES);
-        LOCK = other.LOCK;
-        other.LOCK = nullptr;
+        std::lock_guard<std::mutex> lck(other.LOCK);
+        this->name = std::move(other.name);
+        *(this->frame_ptr) = *(other.frame_ptr);
+        other.frame_ptr->clear();
+        delete other.frame_ptr;
     }
 
     /**
@@ -85,8 +71,9 @@ struct Animation {
      * @details Copies the name and frames from the other animation
      */
     Animation &operator=(const Animation &other) {
-        NAME = other.NAME;
-        FRAMES = other.FRAMES;
+        std::lock_guard<std::mutex> lck(other.LOCK);
+        this->name = other.name;
+        *(this->frame_ptr) = *(other.frame_ptr);
         return *this;
     }
 
@@ -100,19 +87,40 @@ struct Animation {
             vSemaphoreDelete(LOCK);
             LOCK = nullptr;
         }
-        
-        if (FRAMES != nullptr) {
-            FRAMES->clear();
-            delete FRAMES;
-            FRAMES = nullptr;
+
+        if (frame_ptr != nullptr) {
+            frame_ptr->clear();
+            delete frame_ptr;
+            frame_ptr = nullptr;
+        }
+
+        if (name!= nullptr) {
+            name.clear();
+            delete &name;
         }
     }
 
     String getName() {
-        xSemaphoreTake(LOCK, portMAX_DELAY);
+        std::lock_guard<std::mutex> lck(this->LOCK);
         String name = NAME;
-        xSemaphoreGive(LOCK);
         return name;
+    }
+
+    void setName(const String& namestr) {
+        std::lock_guard<std::mutex> lck(this->LOCK);
+        this->name = namestr;
+    }
+
+    int frameCount() {
+        std::lock_guard<std::mutex> lck(this->LOCK);
+        int count = frame_ptr->size();
+        return count;
+    }
+
+    std::vector<std::vector<std::array<uint8_t, 4>>> getFramesDeepCopy() {
+        std::lock_guard<std::mutex> lck(this->LOCK);
+        std::vector<std::vector<std::array<uint8_t, 4>>> framesCopy = *frame_ptr;
+        return framesCopy;
     }
 };
 
