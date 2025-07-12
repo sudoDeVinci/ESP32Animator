@@ -1,12 +1,11 @@
 #pragma once
-#ifndef IO_H
-#define IO_H
 #define DEBUG 1
 
 #include <Arduino.h>
 #include <vector>
 #include <mutex>
 #include <memory>
+#include <array>
 
 #if DEBUG == 1
 /**
@@ -40,29 +39,41 @@ using FrameBuffer = std::vector<Frame>;
 struct Animation {
 private:
     String name_;
-    std::unique_ptr<FrameBuffer> frames_;
+    FrameBuffer frames_;
     mutable std::mutex mutex_;
 
 public:
     Animation() : name("NONE") {}
-  
-    explicit Animation(const String& namestr) 
-        : name_(namestr), frames_(std::make_unique<FrameBuffer>()) {
+
+
+    /**
+     * @brief Constructor with name
+     * @param namestr The name of the animation
+     * @details Initializes the animation with a name and an empty frame buffer
+     */
+    Animation(const String& namestr) : name_(namestr){
         debugf("Animation '%s' created\n", namestr.c_str());
     }
 
+
     /**
-     * @brief Move constructor
-     * @param other The animation to move
-     * @details Moves the name and frames from the other animation
+     * @brief Destructor
      */
-    Animation(Animation &&other) {
-        std::lock_guard<std::mutex> lck(other.LOCK);
-        this->name = std::move(other.name);
-        *(this->frame_ptr) = *(other.frame_ptr);
-        other.frame_ptr->clear();
-        delete other.frame_ptr;
+    ~Animation() = default;
+
+
+    /**
+     * @brief Copy constructor
+     * @param other The animation to copy
+     * @details Copies the name and frames from the other animation
+     */
+    Animation(const Animation& other) {
+        std::lock_guard<std::mutex> lock(other.mutex_);
+        name_ = other.name_;
+        frames_ = other.frames_;
+        debugf("Animation '%s' copied\n", name_.c_str());
     }
+
 
     /**
      * @brief Copy assignment operator
@@ -71,57 +82,119 @@ public:
      * @details Copies the name and frames from the other animation
      */
     Animation &operator=(const Animation &other) {
-        std::lock_guard<std::mutex> lck(other.LOCK);
-        this->name = other.name;
-        *(this->frame_ptr) = *(other.frame_ptr);
+        if (this == &other) return *this;
+        
+        // Lock both objects in consistent order to prevent deadlock
+        std::lock(mutex_, other.mutex_);
+        std::lock_guard<std::mutex> lockthis(mutex_, std::adopt_lock);
+        std::lock_guard<std::mutex> lockother(other.mutex_, std::adopt_lock);
+
+        name_ = other.name_;
+        frames_ = other.frames_;
         return *this;
     }
 
+
     /**
-     * @brief Destructor
-     * @details Deletes the name and lock, and clears the frames
-     * @note This is not thread-safe, and should only be called from the main thread or where the lock is held
+     * @brief Move constructor
+     * @param other The animation to move
+     * @details Moves the name and frames from the other animation
      */
-    ~Animation() {
-        if (LOCK != nullptr) {
-            vSemaphoreDelete(LOCK);
-            LOCK = nullptr;
-        }
-
-        if (frame_ptr != nullptr) {
-            frame_ptr->clear();
-            delete frame_ptr;
-            frame_ptr = nullptr;
-        }
-
-        if (name!= nullptr) {
-            name.clear();
-            delete &name;
-        }
+    Animation(Animation&& other) {
+        std::lock_guard<std::mutex> lock(other.mutex_);
+        name_ = std::move(other.name_);
+        frames_ = std::move(other.frames_);
+        debugf("Animation moved\n");
     }
 
-    String getName() {
-        std::lock_guard<std::mutex> lck(this->LOCK);
-        String name = NAME;
-        return name;
+
+    /**
+     * @brief Move assignment operator
+     * @param other The animation to move
+     * @return A reference to the moved animation
+     */
+    Animation& operator=(Animation&& other) {
+        if (this == &other) return *this;
+        
+        std::lock(mutex_, other.mutex_);
+        std::lock_guard<std::mutex> lockthis(mutex_, std::adopt_lock);
+        std::lock_guard<std::mutex> lockother(other.mutex_, std::adopt_lock);
+        
+        name_ = other.name_;
+        frames_ = other.frames_;
+        return *this;
     }
 
+
+    /**
+     * @brief Get the name of the animation
+     * @return The name of the animation
+     */
+    String getName() const{
+        std::lock_guard<std::mutex> lock(mutex_);
+        return name_;
+    }
+
+
+    /**
+     * @brief Set the name of the animation
+     * @param namestr The new name for the animation
+     */
     void setName(const String& namestr) {
-        std::lock_guard<std::mutex> lck(this->LOCK);
-        this->name = namestr;
+        std::lock_guard<std::mutex> lock(this->mutex_);
+        name_ = namestr;
     }
 
-    int frameCount() {
-        std::lock_guard<std::mutex> lck(this->LOCK);
-        int count = frame_ptr->size();
-        return count;
+
+    /**
+     * @brief Get the count of frames in the animation
+     * @return The number of frames in the animation
+     */
+    size_t frameCount() const {
+        std::lock_guard<std::mutex> lock(this->mutex_);
+        return frames_.size();
     }
 
-    std::vector<std::vector<std::array<uint8_t, 4>>> getFramesDeepCopy() {
-        std::lock_guard<std::mutex> lck(this->LOCK);
-        std::vector<std::vector<std::array<uint8_t, 4>>> framesCopy = *frame_ptr;
-        return framesCopy;
+
+    void setFrames(const FrameBuffer& frames) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        debugf("Setting %zu frames for animation '%s'\n", frames.size(), name_.c_str());
+        frames_ = frames;
+    }
+
+
+    /**
+     * @brief Get a deep copy of the frames in the animation
+     * @return A deep copy of the frame buffer
+     */
+    FrameBuffer getFramesDeepCopy() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        debugf("Deep copy requested for %zu frames\n", frames_.size());
+        FrameBuffer copy = frames_;
+        return copy;
+    }
+
+    /**
+     * @brief Get a reference to the frames in the animation
+     * @return A reference to the frame buffer
+     * @details This method is thread-safe and locks the mutex while accessing frames_
+     */
+    const FrameBuffer& getFrames() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return frames_;
+    }
+
+
+    /**
+     * @brief Clear the frames in the animation
+     * @details Clears the frame buffer and resets the animation name to "NONE"
+     */
+    void clearFrames() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        frames_.clear();
+        name_ = "NONE";
+        debugln("Animation frames cleared");
     }
 };
 
-#endif // IO_H
+#endif
