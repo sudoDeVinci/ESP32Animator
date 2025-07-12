@@ -1,5 +1,5 @@
-#ifndef NEW_RENDER_H
-#define NEW_RENDER_H
+#ifndef RENDER_H
+#define RENDER_H
 
 #include <Adafruit_NeoPixel.h>
 #include "animation.h"
@@ -7,28 +7,30 @@
 
 
 struct RenderState{
-    volatile bool exitEarly = false; // Flag to exit rendering early
-    volatile bool isRunning = false; // Flag to indicate if rendering is active
-    volatile bool repeat = true; // Flag to indicate if the animation should repeat
-    uint8_t ledCount = 10; // Number of LEDs in the strip
-    uint8_t pin = 42; // Pin number for the NeoPixel strip
-    uint16_t frameDelayMs = 50; // Delay between frames in milliseconds
-    uint16_t repeatDelayMs = 50; // Delay before repeating the animation in milliseconds
-    float speedCoefficient = 1.0f; // Speed coefficient for animation playback
-    float peakBrightnessCoefficient = 0.40f; // Peak brightness coefficient for LED colors
-    String currentAnimationName = "NONE"; // Name of the current animation
+    volatile bool exitEarly = false;        // Flag to exit rendering early
+    volatile bool isRunning = false;        // Flag to indicate if rendering is active
+    volatile bool repeat = true;            // Flag to indicate if the animation should repeat
+    uint8_t pin = 42;                       // Pin number for the NeoPixel strip
+    uint16_t ledCount = 10;                 // Number of LEDs in the strip
+    uint16_t frameDelayMs = 50;             // Delay between frames in milliseconds
+    uint16_t repeatDelayMs = 50;            // Delay before repeating the animation in milliseconds
+    float speedCoefficient = 1.0f;          // Speed coefficient for animation playback
+    float peakBrightnessCoefficient = 0.40f;// Peak brightness coefficient for LED colors
+    String currentAnimationName = "NONE";   // Name of the current animation
+    uint32_t currentAnimationHash = 0;      // Hash of current animation name for fast comparison
 
     RenderState(
         bool exitEarly = false,
         bool isRunning = false,
         bool repeat = true,
-        uint8_t ledCount = 10,
+        uint16_t ledCount = 10,
         uint8_t pin = 42,
         uint16_t frameDelayMs = 50,
         uint16_t repeatDelayMs = 50,
         float speedCoefficient = 1.0f,
         float peakBrightnessCoefficient = 0.40f,
-        String currentAnimationName = "NONE"
+        String currentAnimationName = "NONE",
+        uint32_t currentAnimationHash = 0
     ):
         exitEarly(exitEarly),
         isRunning(isRunning),
@@ -39,7 +41,8 @@ struct RenderState{
         repeatDelayMs(repeatDelayMs),
         speedCoefficient(speedCoefficient),
         peakBrightnessCoefficient(peakBrightnessCoefficient),
-        currentAnimationName(currentAnimationName)
+        currentAnimationName(currentAnimationName),
+        currentAnimationHash(currentAnimationHash)
     {}
 
 
@@ -54,6 +57,7 @@ struct RenderState{
         speedCoefficient = other.speedCoefficient;
         peakBrightnessCoefficient = other.peakBrightnessCoefficient;
         currentAnimationName = other.currentAnimationName;
+        currentAnimationHash = other.currentAnimationHash;
     }
 
     RenderState& operator=(const RenderState& other) {
@@ -69,6 +73,7 @@ struct RenderState{
         speedCoefficient = other.speedCoefficient;
         peakBrightnessCoefficient = other.peakBrightnessCoefficient;
         currentAnimationName = other.currentAnimationName;
+        currentAnimationHash = other.currentAnimationHash;
 
         return *this;
     }
@@ -82,10 +87,10 @@ struct RenderState{
 struct Renderer {
 private:
     volatile bool exitEarly;
-    volatile bool isRunning;
+    volatile bool isRunning_;
     volatile bool repeat;
-    uint8_t ledCount;
     uint8_t pin;
+    uint16_t ledCount;
     uint16_t frameDelayMs;
     uint16_t repeatDelayMs;
     float speedCoefficient;
@@ -96,14 +101,14 @@ private:
 
 public:
     Renderer(
-        uint8_t ledCount = 10,
+        uint16_t ledCount = 10,
         uint8_t pin = 42, 
         uint16_t frameDelayMs = 50,
         uint16_t repeatDelayMs = 50, 
         float speedCoef = 1.0f,
         float peakBrightnessCoef = 0.40f,
         bool repeat = true,
-        bool isRunning = false
+        bool running = false
         ):
         ledCount(ledCount),
         pin(pin),
@@ -112,7 +117,7 @@ public:
         speedCoefficient(speedCoef),
         peakBrightnessCoefficient(peakBrightnessCoef),
         repeat(repeat),
-        isRunning(isRunning),
+        isRunning_(running),
         exitEarly(false),
         screen(ledCount, pin, NEO_GRB + NEO_KHZ800)
     {}
@@ -125,15 +130,16 @@ public:
         speedCoefficient = state.speedCoefficient;
         peakBrightnessCoefficient = state.peakBrightnessCoefficient;
         repeat = state.repeat;
-        isRunning = state.isRunning;
+        isRunning_ = state.isRunning;
         exitEarly = state.exitEarly;
+        this->screen = Adafruit_NeoPixel(ledCount, pin, NEO_GRB + NEO_KHZ800);
     }
 
     RenderState outputState() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return RenderState{
             exitEarly,
-            isRunning,
+            isRunning_,
             repeat,
             ledCount,
             pin,
@@ -141,7 +147,8 @@ public:
             repeatDelayMs,
             speedCoefficient,
             peakBrightnessCoefficient,
-            currentAnimation.getName()
+            currentAnimation.getName(),
+            currentAnimation.getNameHash()
         };
     }
 
@@ -159,7 +166,7 @@ public:
         // Set the current animation as non-running
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            this->isRunning = false;
+            this->isRunning_ = false;
         }
         
         // Give the other thread time to stop rendering task
@@ -172,7 +179,7 @@ public:
             debugln("Copying new animation data");
             currentAnimation = anim; // This will properly copy all data
         
-            this->isRunning = true;
+            this->isRunning_ = true;
         }
 
         debugln(">> New animation " + currentAnimation.getName() + " set with " + 
@@ -185,7 +192,7 @@ public:
      */
     bool isRunning() const {
         std::lock_guard<std::mutex> lock(mutex_);
-        return isRunning;
+        return isRunning_;
     }
 
     /**
@@ -194,7 +201,7 @@ public:
      */
     void setRunning(bool running) {
         std::lock_guard<std::mutex> lock(mutex_);
-        isRunning = running;
+        isRunning_ = running;
     }
 
     /**
@@ -226,7 +233,7 @@ public:
      * @brief Shows the current state of the LED strip
      * @details Updates the LED strip to reflect the current pixel colors
      */
-    void showScreen() const {
+    void showScreen() {
         std::lock_guard<std::mutex> lock(mutex_);
         screen.show();
     }
@@ -254,10 +261,10 @@ public:
      * @param pixel The pixel index and RGB color values
      */
     void setPixelColor(const Pixel& pixel) {
-        if (pixel[0] >= ledCount) return;
+        if (pixel.index >= ledCount) return;
 
         std::lock_guard<std::mutex> lock(mutex_);
-        screen.setPixelColor(pixel[0], screen.Color(pixel[1], pixel[2], pixel[3]));
+        screen.setPixelColor(pixel.index, screen.Color(pixel.r, pixel.g, pixel.b));
     }
 
     /**
@@ -268,12 +275,12 @@ public:
     void writeFrameToScreen(const Frame& frame) {
         std::lock_guard<std::mutex> lock(mutex_);
         for (const Pixel& pixel : frame) {
-            if (pixel[0] >= ledCount) continue;
+            if (pixel.index >= ledCount) continue;
             screen.setPixelColor(
-                pixel[0],
-                static_cast<uint8_t>(pixel[1] * peakBrightnessCoefficient),
-                static_cast<uint8_t>(pixel[2] * peakBrightnessCoefficient),
-                static_cast<uint8_t>(pixel[3] * peakBrightnessCoefficient)
+                pixel.index,
+                static_cast<uint8_t>(pixel.r * peakBrightnessCoefficient),
+                static_cast<uint8_t>(pixel.g * peakBrightnessCoefficient),
+                static_cast<uint8_t>(pixel.b * peakBrightnessCoefficient)
             );
         }
         screen.show();
@@ -323,7 +330,7 @@ public:
      * @brief Gets the LED count
      * @return The number of LEDs in the strip
      */
-    uint8_t getLedCount() const {
+    uint16_t getLedCount() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return ledCount;
     }
@@ -332,9 +339,9 @@ public:
      * @brief Sets the LED count
      * @param count The new LED count
      */
-    void setLedCount(uint8_t count) {
-        if (count == 0 || count > 255) return;
+    void setLedCount(uint16_t count) {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (count == 0 || count > 65535) return;
         ledCount = count;
         screen.updateLength(ledCount);
         screen.begin();
@@ -423,6 +430,6 @@ public:
  * Render the current animation with the given renderer settings.
  * @param rend The renderer to use
  */
-void render(Renderer& rend);
+RenderState render(Renderer& rend);
 
 #endif

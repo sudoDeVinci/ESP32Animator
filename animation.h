@@ -1,4 +1,6 @@
 #pragma once
+#ifndef ANIMATION_H
+#define ANIMATION_H
 #define DEBUG 1
 
 #include <Arduino.h>
@@ -31,28 +33,66 @@
 #define debugf(...)
 #endif
 
+
 // Type aliases for code clarity and maintainability
-using Pixel = std::array<uint8_t, 4>;
+struct Pixel {
+    uint16_t index;
+    uint8_t r, g, b;
+
+    Pixel(
+        uint16_t idx,
+        uint8_t red = 0,
+        uint8_t green = 0,
+        uint8_t blue = 0
+    ) : index(idx), r(red), g(green), b(blue) {}
+
+    /**
+     * @brief Copy Assignment constructor
+     * We dont wanna copy the index, just the color
+     * @param other The pixel to copy
+     */
+    Pixel& operator=(const Pixel& other) {
+        if (this != &other) {
+            r = other.r;
+            g = other.g;
+            b = other.b;
+        }
+        return *this;
+    }
+};
 using Frame = std::vector<Pixel>;
 using FrameBuffer = std::vector<Frame>;
 
 struct Animation {
 private:
     String name_;
+    uint32_t nameHash_;  // Cache the hash for fast comparisons
     FrameBuffer frames_;
     mutable std::mutex mutex_;
 
 public:
-    Animation() : name("NONE") {}
+    Animation() : name_("NONE"), nameHash_(hash_string_runtime("NONE")) {}
 
+    /**
+     * @brief Fast runtime string hashing for animation name comparisons
+     * @param str The string to hash
+     * @return The hash of the string
+     */
+    inline uint32_t hash_string_runtime(const String& str) {
+        uint32_t hash = 5381;
+        for (size_t i = 0; i < str.length(); i++) {
+            hash = ((hash << 5) + hash) + str[i];
+        }
+        return hash;
+    }
 
     /**
      * @brief Constructor with name
      * @param namestr The name of the animation
      * @details Initializes the animation with a name and an empty frame buffer
      */
-    Animation(const String& namestr) : name_(namestr){
-        debugf("Animation '%s' created\n", namestr.c_str());
+    Animation(const String& namestr) : name_(namestr), nameHash_(hash_string_runtime(namestr)) {
+        debugf("Animation '%s' created with hash %u\n", namestr.c_str(), nameHash_);
     }
 
 
@@ -70,6 +110,7 @@ public:
     Animation(const Animation& other) {
         std::lock_guard<std::mutex> lock(other.mutex_);
         name_ = other.name_;
+        nameHash_ = other.nameHash_;
         frames_ = other.frames_;
         debugf("Animation '%s' copied\n", name_.c_str());
     }
@@ -90,6 +131,7 @@ public:
         std::lock_guard<std::mutex> lockother(other.mutex_, std::adopt_lock);
 
         name_ = other.name_;
+        nameHash_ = other.nameHash_;
         frames_ = other.frames_;
         return *this;
     }
@@ -103,6 +145,7 @@ public:
     Animation(Animation&& other) {
         std::lock_guard<std::mutex> lock(other.mutex_);
         name_ = std::move(other.name_);
+        nameHash_ = other.nameHash_;
         frames_ = std::move(other.frames_);
         debugf("Animation moved\n");
     }
@@ -120,8 +163,9 @@ public:
         std::lock_guard<std::mutex> lockthis(mutex_, std::adopt_lock);
         std::lock_guard<std::mutex> lockother(other.mutex_, std::adopt_lock);
         
-        name_ = other.name_;
-        frames_ = other.frames_;
+        name_ = std::move(other.name_);
+        nameHash_ = other.nameHash_;
+        frames_ = std::move(other.frames_);
         return *this;
     }
 
@@ -143,6 +187,17 @@ public:
     void setName(const String& namestr) {
         std::lock_guard<std::mutex> lock(this->mutex_);
         name_ = namestr;
+        nameHash_ = hash_string_runtime(namestr);
+    }
+
+
+    /**
+     * @brief Get the hash of the animation name for fast comparisons
+     * @return The hash of the animation name
+     */
+    uint32_t getNameHash() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return nameHash_;
     }
 
 
@@ -193,6 +248,7 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         frames_.clear();
         name_ = "NONE";
+        nameHash_ = hash_string_runtime("NONE");
         debugln("Animation frames cleared");
     }
 };

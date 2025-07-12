@@ -4,7 +4,10 @@
 #define LED_PIN 42
 
 // Global renderer
-Renderer renderer;
+Renderer renderer = Renderer(
+	10,
+	LED_PIN
+);
 
 // Task handles
 TaskHandle_t renderTaskHandle = NULL;
@@ -14,9 +17,10 @@ TaskHandle_t renderTaskHandle = NULL;
  * @param parameters Task parameters
  */
 void renderTask(void* parameters) {
+	RenderState state = renderer.outputState();
     while (true) {
-      if (renderer.isRunning()) render(&renderer);
-      if (renderer.interruptableDelay((unsigned long)(renderer.REPEATDELAY / renderer.SPEED))) renderer.setEarlyExit(false);
+      if (renderer.isRunning()) state = render(renderer);
+      if (renderer.interruptableDelay((unsigned long)(state.frameDelayMs / state.speedCoefficient))) renderer.setEarlyExit(false);
     }
 }
 
@@ -24,13 +28,6 @@ void setup() {
 	// Initialize serial communication
 	Serial.begin(115200);
 	while (!Serial) vTaskDelay(100 / portTICK_PERIOD_MS);
-	
-	// Initialize renderer with default settings
-	renderer = Renderer(
-		pin = LED_PIN,
-		peakBrightnessCoef = 0.50f,
-
-	);
 
 	// Initialize the NeoPixel screen - Give it time to set up
 	renderer.initializeScreen();
@@ -42,9 +39,9 @@ void setup() {
 		"RenderTask",       // Task name
 		2097152,            // Stack size (bytes)
 		NULL,               // Task parameters
-		1,                  // Priority
+		2,                  // Priority (higher than default)
 		&renderTaskHandle,  // Task handle;
-		0                   // Core to run on
+		1                   // Core to run on (dedicate core 1 to rendering)
 	);
 	}
 
@@ -53,5 +50,5 @@ void setup() {
  */
 void loop() {
     // Main loop is empty since we're using FreeRTOS tasks
-    vTaskDelay(1_000_000 / portTICK_PERIOD_MS);
+    vTaskDelay(1000000 / portTICK_PERIOD_MS);
 }
