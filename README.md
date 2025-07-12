@@ -8,14 +8,9 @@ Leverages the esp32's dual cores for LED animations. This allows menu usage and 
 
 ## Dual-Core Utilization
 The ESP32's dual-core capability is leveraged for optimal performance:
-
-Core 0 Handles user interaction tasks
-- Menus
-- Button processing
-- Sensors and antennaes
-
-Core 1: Dedicated to time-sensitive operations
+ The render task takes care of
 - Animation rendering
 - LED strip updates
 - Timing-related calculations
 
+Leaving other tasks on either core free for sensor data and communication
