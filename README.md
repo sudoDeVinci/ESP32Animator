@@ -1,3 +1,5 @@
+[![Compile](https://github.com/sudoDeVinci/ESP32Animator/actions/workflows/compile.yml/badge.svg?branch=main)](https://github.com/sudoDeVinci/ESP32Animator/actions/workflows/compile.yml)
+
 # ESP32 LED Animation Controller
 LED animation controller for ESP32.
 
