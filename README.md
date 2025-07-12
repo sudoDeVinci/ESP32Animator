@@ -1,6 +1,6 @@
 [![Compile](https://github.com/sudoDeVinci/ESP32Animator/actions/workflows/compile.yml/badge.svg?branch=main)](https://github.com/sudoDeVinci/ESP32Animator/actions/workflows/compile.yml)
 
-# 🎨 ESP32Animator
+# ESP32Animator
 
 > **Dual-core LED animation engine for ESP32 microcontrollers**
 
