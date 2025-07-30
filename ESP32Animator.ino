@@ -43,7 +43,7 @@ void setup() {
 		&renderTaskHandle,  // Task handle;
 		1                   // Core to run on (dedicate core 1 to rendering)
 	);
-	}
+}
 
 /**
  * Main loop function

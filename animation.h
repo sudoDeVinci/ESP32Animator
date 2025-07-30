@@ -8,6 +8,7 @@
 #include <mutex>
 #include <memory>
 #include <array>
+#include <string>
 
 #if DEBUG == 1
 /**
@@ -65,8 +66,8 @@ using FrameBuffer = std::vector<Frame>;
 
 struct Animation {
 private:
-    String name_;
-    uint32_t nameHash_;  // Cache the hash for fast comparisons
+    std::string name_;
+    uint32_t nameHash_;
     FrameBuffer frames_;
     mutable std::mutex mutex_;
 
@@ -91,7 +92,7 @@ public:
      * @param namestr The name of the animation
      * @details Initializes the animation with a name and an empty frame buffer
      */
-    Animation(const String& namestr) : name_(namestr), nameHash_(hash_string_runtime(namestr)) {
+    Animation(const std::string& namestr) : name_(namestr), nameHash_(hash_string_runtime(namestr)) {
         debugf("Animation '%s' created with hash %u\n", namestr.c_str(), nameHash_);
     }
 
@@ -174,7 +175,7 @@ public:
      * @brief Get the name of the animation
      * @return The name of the animation
      */
-    String getName() const{
+    const std::string& getName() const{
         std::lock_guard<std::mutex> lock(mutex_);
         return name_;
     }
@@ -220,6 +221,7 @@ public:
 
     /**
      * @brief Get a deep copy of the frames in the animation
+     * @warning Creating a full new FrameBuffer - lots of memory allocation here.
      * @return A deep copy of the frame buffer
      */
     FrameBuffer getFramesDeepCopy() const {

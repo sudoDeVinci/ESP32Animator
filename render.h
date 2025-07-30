@@ -16,7 +16,7 @@ struct RenderState{
     uint16_t repeatDelayMs = 50;            // Delay before repeating the animation in milliseconds
     float speedCoefficient = 1.0f;          // Speed coefficient for animation playback
     float peakBrightnessCoefficient = 0.40f;// Peak brightness coefficient for LED colors
-    String currentAnimationName = "NONE";   // Name of the current animation
+    std::string currentAnimationName = "NONE";   // Name of the current animation
     uint32_t currentAnimationHash = 0;      // Hash of current animation name for fast comparison
 
     RenderState(
@@ -29,7 +29,7 @@ struct RenderState{
         uint16_t repeatDelayMs = 50,
         float speedCoefficient = 1.0f,
         float peakBrightnessCoefficient = 0.40f,
-        String currentAnimationName = "NONE",
+        std::string currentAnimationName = "NONE",
         uint32_t currentAnimationHash = 0
     ):
         exitEarly(exitEarly),
@@ -163,8 +163,9 @@ public:
     }
 
     void setAnimation(const Animation& anim) {
-        // Set the current animation as non-running
+        
         {
+            // Set the current animation as non-running
             std::lock_guard<std::mutex> lock(mutex_);
             this->isRunning_ = false;
         }
@@ -172,18 +173,21 @@ public:
         // Give the other thread time to stop rendering task
         vTaskDelay(this->repeatDelayMs / portTICK_PERIOD_MS);
 
-        // Safely copy the animation data
+        
         {
+            // Safely copy the animation data
             std::lock_guard<std::mutex> lock(mutex_);
 
             debugln("Copying new animation data");
-            currentAnimation = anim; // This will properly copy all data
+            currentAnimation = anim;
         
             this->isRunning_ = true;
         }
 
-        debugln(">> New animation " + currentAnimation.getName() + " set with " + 
-                String(currentAnimation.frameCount()) + " frames");
+        debugf(">> New animation %s set with %d\n",
+                currentAnimation.getName(),
+                currentAnimation.frameCount()
+        );
     }
 
     /**
@@ -345,15 +349,15 @@ public:
         ledCount = count;
         screen.updateLength(ledCount);
         screen.begin();
-        debugln("LED count set to " + String(ledCount));
+        debugf("LED count set to %d\n", ledCount);
     }
     
     
     void print() const {
         std::lock_guard<std::mutex> lock(mutex_);
-        debugln("LED COUNT: " + String(ledCount));
-        debugln("PIN: " + String(pin));
-        debugln("SPEED: " + String(speedCoefficient));
+        debugf("LED COUNT: %d\n", ledCount);
+        debugf("PIN: %d\n", pin);
+        debugf("SPEED: %f\n",speedCoefficient);
         debugf("PEAK BRIGHTNESS: %f\n", peakBrightnessCoefficient);
         debugln();
     }
@@ -362,7 +366,7 @@ public:
      * @brief Gets the current animation name
      * @return The name of the current animation
      */
-    String getCurrentAnimationName() const {
+    const std::string& getCurrentAnimationName() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return currentAnimation.getName();
     }
@@ -394,6 +398,10 @@ public:
         return exitEarly;
     }
 
+    /**
+     * @brief Get a reference to the current Animation FrameBuffer
+     * @return const reference to the current Animation FrameBuffer
+     */
     const FrameBuffer& getCurrentAnimationFrames() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return currentAnimation.getFrames();
@@ -402,7 +410,7 @@ public:
     bool interruptableDelay(
         const unsigned long milliseconds,
         const unsigned long checkEveryMs = 10
-    ) {
+    ) const {
         unsigned long checks = milliseconds / checkEveryMs;
         unsigned long remainder = milliseconds % checkEveryMs;
         bool interrupted = false;
