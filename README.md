@@ -121,7 +121,7 @@ size_t count = anim.frameCount();
 FrameBuffer frames = anim.getFramesDeepCopy();
 
 // Thread-safe operations
-String name = anim.getName();
+std::string name = anim.getName();
 uint32_t hash = anim.getNameHash();   // Fast comparison
 ```
 

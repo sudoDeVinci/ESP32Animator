@@ -79,7 +79,7 @@ public:
      * @param str The string to hash
      * @return The hash of the string
      */
-    inline uint32_t hash_string_runtime(const String& str) {
+    inline uint32_t hash_string_runtime(const std::string& str) {
         uint32_t hash = 5381;
         for (size_t i = 0; i < str.length(); i++) {
             hash = ((hash << 5) + hash) + str[i];
@@ -93,7 +93,7 @@ public:
      * @details Initializes the animation with a name and an empty frame buffer
      */
     Animation(const std::string& namestr) : name_(namestr), nameHash_(hash_string_runtime(namestr)) {
-        debugf("Animation '%s' created with hash %u\n", namestr.c_str(), nameHash_);
+        debugf("Animation '%s' created with hash %zu\n", namestr.c_str(), nameHash_);
     }
 
 
@@ -185,7 +185,7 @@ public:
      * @brief Set the name of the animation
      * @param namestr The new name for the animation
      */
-    void setName(const String& namestr) {
+    void setName(const std::string& namestr) {
         std::lock_guard<std::mutex> lock(this->mutex_);
         name_ = namestr;
         nameHash_ = hash_string_runtime(namestr);
