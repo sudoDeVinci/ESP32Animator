@@ -1,10 +1,6 @@
 #include "io.h"
 #include "animation.h"
 #include "render.h"
-#include <Arduino.h>
-#include "FS.h"
-#include <LittleFS.h>
-#include "SD_MMC.h"
 
 #define LED_PIN 42
 

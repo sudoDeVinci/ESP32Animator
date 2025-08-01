@@ -47,40 +47,68 @@ The rendering engine runs on a dedicated core, ensuring your animations stay smo
 // Create renderer with 10 LEDs on pin 42
 Renderer renderer(10, 42);
 
-void setup() {
-    Serial.begin(115200);
-    
-    // Initialize the LED strip
-    renderer.initializeScreen();
-    
-    // Create dedicated render task on core 1
-    xTaskCreatePinnedToCore(
-        renderTask,
-        "RenderTask", 
-        2097152,      // 2MB stack
-        NULL, 
-        2,            // High priority
-        &renderTaskHandle,
-        1             // Core 1
-    );
+void renderTask(void* parameters) {
+	RenderState state = renderer.outputState();  
+	while (true) {
+		debugln("Render loopin!");
+		if (renderer.isRunning()) state = render(renderer);	
+		if (renderer.interruptableDelay((unsigned long)(state.frameDelayMs / state.speedCoefficient))) renderer.setEarlyExit(false);
+	}
 }
 
-void renderTask(void* parameters) {
-    while (true) {
-        if (renderer.isRunning()) {
-            render(renderer);
-        }
-        vTaskDelay(1);
+void setup() {
+    Serial.begin(115200);
+    while (!Serial) delay(10 / portTICK_PERIOD_MS);
+            ...
+
+    sdmmcInit();
+	fs::FS& fs = determineFileSystem();
+    FileWrapper root(fs, "/");
+    const std::string folder = "animations";
+	const FileWrapper& animationdir = root.getDir(folder);
+    const std::string animationfile = "blink.json";
+	const FileWrapper& animationJson = animationdir.getFile(animationfile);
+
+            ...
+
+    Animation animation = loadAnimation(fs, animationJson.getPath());
+
+	renderer.setLedCount(100);
+	renderer.setAnimation(animation);
+	renderer.setPeakBrightness(0.075f);
+	renderer.setframeDelayms(125);
+	renderer.setrepeatDelayms(2000);
+
+            ...
+
+    renderer.initializeScreen();
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+	renderer.setRunning(true);
+
+            ...
+    
+    if (xTaskCreatePinnedToCore(
+		renderTask,                 // Function to run
+		"RenderTask",               // Task name
+		102400,                     // Stack size (bytes)
+		NULL,                       // Task parameters
+		2,                          // Priority (higher than default)
+		&renderTaskHandle,          // Task handle;
+		1                           // Core to run on (dedicate core 1 to rendering)
+    ) != pdPASS) {
+        debugln("Failed to create render task!");
     }
+}
+
+void loop() {
+    vTaskDelay(1000000 / portTICK_PERIOD_MS);
 }
 ```
 
 ### Creating Animations
 ```cpp
-// Create an animation
 Animation myAnimation("rainbow_wave");
 
-// Build frame data
 FrameBuffer frames;
 for (int frame = 0; frame < 30; frame++) {
     Frame currentFrame;
@@ -96,7 +124,54 @@ myAnimation.setFrames(frames);
 renderer.setAnimation(myAnimation);
 ```
 
-## 🎛️ API Reference
+Or, define Json files.
+
+```json
+{
+    "metadata": {
+        "name": "blink",
+        "width": 10,
+        "height": 10,
+        "total_pixels": 100,
+        "frame_count": 95,
+        "format": "bgr",
+        "frame_delay_ms": 100,
+        "repeat_delay:ms": 1000
+    },
+    "frames": [
+        [
+            [
+                31,
+                239,
+                183,
+                0
+            ],
+            [
+                32,
+                239,
+                183,
+                0
+            ],
+        ...
+        
+        ],
+
+        ...
+    
+    ]
+}
+```
+
+Then load them into Animation  objects
+
+```cpp
+fs::FS& fs = determineFileSystem();
+const std::string filename = "//animations/blink.json";
+Animation animation = loadAnimation(fs, filename);
+```
+
+
+## 🎛️ Quick Reference
 
 ### Renderer Control
 ```cpp
