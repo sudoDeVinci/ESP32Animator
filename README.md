@@ -62,7 +62,7 @@ void setup() {
             ...
 
     sdmmcInit();
-	fs::FS& fs = determineFileSystem();
+    fs::FS& fs = determineFileSystem();
     FileWrapper root(fs, "/");
     const std::string folder = "animations";
     const FileWrapper& animationdir = root.getDir(folder);
