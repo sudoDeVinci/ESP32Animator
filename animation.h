@@ -3,39 +3,21 @@
 #define ANIMATION_H
 #define DEBUG 1
 
+#include "io.h"
 #include <Arduino.h>
 #include <vector>
 #include <mutex>
 #include <memory>
 #include <array>
 #include <string>
+#include <cstdint>
+#include <algorithm>
 
-#if DEBUG == 1
-/**
- * @brief Print debug information when DEBUG is enabled
- * @param ... Arguments to pass to Serial.print
- */
-#define debug(...) Serial.print(__VA_ARGS__)
 
 /**
- * @brief Print debug information with newline when DEBUG is enabled
- * @param ... Arguments to pass to Serial.println
+ * @brief A single pixel in the animation with an index and RGB color values
+ * @details Contains an index and RGB color values
  */
-#define debugln(...) Serial.println(__VA_ARGS__)
-
-/**
- * @brief Print formatted debug information when DEBUG is enabled
- * @param ... Arguments to pass to Serial.printf
- */
-#define debugf(...) Serial.printf(__VA_ARGS__)
-#else
-#define debug(...)
-#define debugln(...)
-#define debugf(...)
-#endif
-
-
-// Type aliases for code clarity and maintainability
 struct Pixel {
     uint16_t index;
     uint8_t r, g, b;
@@ -61,6 +43,7 @@ struct Pixel {
         return *this;
     }
 };
+
 using Frame = std::vector<Pixel>;
 using FrameBuffer = std::vector<Frame>;
 
@@ -73,6 +56,11 @@ private:
 
 public:
     Animation() : name_("NONE"), nameHash_(hash_string_runtime("NONE")) {}
+
+    Animation(
+        const std::string& namestr,
+        const FrameBuffer& frames = FrameBuffer()
+    ) : name_(namestr), nameHash_(hash_string_runtime(namestr)), frames_(frames) {}
 
     /**
      * @brief Fast runtime string hashing for animation name comparisons
@@ -148,7 +136,6 @@ public:
         name_ = std::move(other.name_);
         nameHash_ = other.nameHash_;
         frames_ = std::move(other.frames_);
-        debugf("Animation moved\n");
     }
 
 
@@ -254,5 +241,14 @@ public:
         debugln("Animation frames cleared");
     }
 };
+
+
+/**
+ * @brief Load an animation from a file in the specified file system.
+ * @param fs The file system to read from.
+ * @param path The path to the animation file.
+ * @return An Animation object loaded from the file, or an empty Animation if loading failed.
+ */
+Animation loadAnimation(fs::FS& fs, const std::string& path);
 
 #endif

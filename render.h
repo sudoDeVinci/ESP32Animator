@@ -1,6 +1,7 @@
 #ifndef RENDER_H
 #define RENDER_H
 
+#include "io.h"
 #include <Adafruit_NeoPixel.h>
 #include "animation.h"
 #include <math.h>
@@ -184,8 +185,8 @@ public:
             this->isRunning_ = true;
         }
 
-        debugf(">> New animation %s set with %d\n",
-                currentAnimation.getName(),
+        debugf(">> New animation %s set with %d frames\n",
+                currentAnimation.getName().c_str(),
                 currentAnimation.frameCount()
         );
     }
@@ -214,7 +215,9 @@ public:
      */
     void initializeScreen() {
         std::lock_guard<std::mutex> lock(mutex_);
-        screen = Adafruit_NeoPixel(ledCount, pin, NEO_GRB + NEO_KHZ800);
+        // NEED new here to heap allocate and keep around
+        Adafruit_NeoPixel* sc = new Adafruit_NeoPixel(ledCount, pin, NEO_GRB + NEO_KHZ800);
+        this->screen = *sc;
         screen.begin();
 
         for (uint8_t i = 0; i < ledCount; i++) {
@@ -277,7 +280,9 @@ public:
      * @details This method is thread-safe and locks the mutex while writing the frame
      */
     void writeFrameToScreen(const Frame& frame) {
+        debugln(">> Writing frame to screen");
         std::lock_guard<std::mutex> lock(mutex_);
+        debugln(">> Grabbed Lock 4 screen");
         for (const Pixel& pixel : frame) {
             if (pixel.index >= ledCount) continue;
             screen.setPixelColor(
@@ -287,7 +292,9 @@ public:
                 static_cast<uint8_t>(pixel.b * peakBrightnessCoefficient)
             );
         }
+        debugln(">> Wrote pixel data to buffer");
         screen.show();
+        debugln(">> Frame written to screen");
     }
 
     /**
@@ -352,6 +359,14 @@ public:
         debugf("LED count set to %d\n", ledCount);
     }
     
+
+    void setframeDelayms(int ms) {
+        this->frameDelayMs = ms;
+    }
+
+    void setrepeatDelayms(int ms) {
+        this->repeatDelayMs = ms;
+    }
     
     void print() const {
         std::lock_guard<std::mutex> lock(mutex_);

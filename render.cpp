@@ -3,9 +3,11 @@
 RenderState render(Renderer& rend) {
 
     if (!rend.isRunning()) {
-        debugln(">> No animation to render or simply not running");
+        debugln(">> Animation simply not running");
         return rend.outputState();
     }
+
+    debugln(">> Animation is still running");
 
     // Check if the current animation is empty
     if (rend.isAnimationEmpty()) {
@@ -13,10 +15,14 @@ RenderState render(Renderer& rend) {
         return rend.outputState();
     }
 
+    debugln(">> Animation isn't empty");
+
     // Create local copies of all settings
     RenderState state = rend.outputState();
     uint32_t currentNameHash = state.currentAnimationHash;
     uint32_t previousNameHash = currentNameHash;
+
+    debugln(">>Got the current render state");
 
     // Get a reference to the frames in the current animation
     const FrameBuffer& frames = rend.getCurrentAnimationFrames();
@@ -25,6 +31,8 @@ RenderState render(Renderer& rend) {
         debugln(">> No frames in the animation, stopping render");
         return rend.outputState();
     }
+
+    debugln(">> Retrieved frame buffer");
 
     size_t frameSize = frames[0].size();
     debugln(">> Starting render loop");
