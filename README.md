@@ -65,36 +65,36 @@ void setup() {
 	fs::FS& fs = determineFileSystem();
     FileWrapper root(fs, "/");
     const std::string folder = "animations";
-	const FileWrapper& animationdir = root.getDir(folder);
+    const FileWrapper& animationdir = root.getDir(folder);
     const std::string animationfile = "blink.json";
-	const FileWrapper& animationJson = animationdir.getFile(animationfile);
+    const FileWrapper& animationJson = animationdir.getFile(animationfile);
 
             ...
 
     Animation animation = loadAnimation(fs, animationJson.getPath());
 
-	renderer.setLedCount(100);
-	renderer.setAnimation(animation);
-	renderer.setPeakBrightness(0.075f);
-	renderer.setframeDelayms(125);
-	renderer.setrepeatDelayms(2000);
+    renderer.setLedCount(100);
+    renderer.setAnimation(animation);
+    renderer.setPeakBrightness(0.075f);
+    renderer.setframeDelayms(125);
+    renderer.setrepeatDelayms(2000);
 
             ...
 
     renderer.initializeScreen();
-	vTaskDelay(100 / portTICK_PERIOD_MS);
-	renderer.setRunning(true);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    renderer.setRunning(true);
 
             ...
     
     if (xTaskCreatePinnedToCore(
-		renderTask,                 // Function to run
-		"RenderTask",               // Task name
-		102400,                     // Stack size (bytes)
-		NULL,                       // Task parameters
-		2,                          // Priority (higher than default)
-		&renderTaskHandle,          // Task handle;
-		1                           // Core to run on (dedicate core 1 to rendering)
+        renderTask,                 // Function to run
+        RenderTask",               // Task name
+        102400,                     // Stack size (bytes)
+        NULL,                       // Task parameters
+        2,                          // Priority (higher than default)
+        &renderTaskHandle,          // Task handle;
+        1                           // Core to run on (dedicate core 1 to rendering)
     ) != pdPASS) {
         debugln("Failed to create render task!");
     }
