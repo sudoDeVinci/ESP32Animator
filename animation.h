@@ -113,7 +113,7 @@ public:
      */
     Animation &operator=(const Animation &other) {
         if (this == &other) return *this;
-        
+
         // Lock both objects in consistent order to prevent deadlock
         std::lock(mutex_, other.mutex_);
         std::lock_guard<std::mutex> lockthis(mutex_, std::adopt_lock);
@@ -146,11 +146,11 @@ public:
      */
     Animation& operator=(Animation&& other) {
         if (this == &other) return *this;
-        
+
         std::lock(mutex_, other.mutex_);
         std::lock_guard<std::mutex> lockthis(mutex_, std::adopt_lock);
         std::lock_guard<std::mutex> lockother(other.mutex_, std::adopt_lock);
-        
+
         name_ = std::move(other.name_);
         nameHash_ = other.nameHash_;
         frames_ = std::move(other.frames_);

@@ -4,26 +4,20 @@
 
 > **Dual-core LED animation engine for ESP32 microcontrollers**
 
-A thread-safe animation component designed to use NeoPixel LED strips. Built to leverage the ESP32's dual-core architecture for smooth, uninterrupted animations while keeping your main application responsive.
+A thread-safe renderer designed to use NeoPixel LED strips. Built to leverage the ESP32's dual-core architecture for smooth animations while keeping your main application responsive.
 
-## ✨ Features
+## Features
 
-### 🚀 **Dual-Core Architecture**
-- **Dedicated render core** for pixel-perfect timing
-- **Thread-safe Non-blocking animations** that won't freeze your UI
-- **Interruptible delays** for responsive control
+### Dual-Core Architecture
+- Dedicated render core for pixel-perfect timing
+- Thread-safe Non-blocking animations that won't freeze your UI
 
-### 🎭 **Advanced Animation System**
-- **Dynamic speed control** with real-time adjustment
-- **Brightness control** with peak brightness limiting
-- **Repeat modes** for looping animations
+### Developer-Focused
+- RAII compliant
+- Prioritizes using modern STL containers 
+- Extensible design for custom animation types
 
-### 🔧 **Developer-Friendly**
-- **RAII compliant** with modern STL containers
-- **Memory efficient** with smart copying and moving
-- **Extensible design** for custom animation types
-
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐
@@ -38,7 +32,7 @@ A thread-safe animation component designed to use NeoPixel LED strips. Built to 
 
 The rendering engine runs on a dedicated core, ensuring your animations stay smooth even when your main application is busy processing sensors, handling user input, or managing network communications.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Basic Setup
 ```cpp
@@ -171,7 +165,7 @@ Animation animation = loadAnimation(fs, filename);
 ```
 
 
-## 🎛️ Quick Reference
+## Quick Reference
 
 ### Renderer Control
 ```cpp
@@ -215,7 +209,7 @@ Frame frame = {
 renderer.writeFrameToScreen(frame);
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Hardware Setup
 - **ESP32** development board
